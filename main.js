@@ -3405,6 +3405,8 @@ function createDesktopPet() {
       font:bold 12px sans-serif; color:#333; white-space:nowrap; display:none;
       box-shadow:0 1px 6px rgba(0,0,0,.08); pointer-events:none; }
     .bubble.show { display:block; }
+    .pet[data-state="recording"] { animation: swim 1s ease-in-out infinite; filter: drop-shadow(0 0 8px red); }
+    .pet[data-state="playing"] { animation: swim 0.6s ease-in-out infinite; filter: drop-shadow(0 0 8px #22c55e); }
     @keyframes swim {
       0%,5%   { transform:translateX(32px) scaleX(1); }
       15%     { transform:translateX(16px) scaleX(1); }
@@ -3460,6 +3462,19 @@ function createDesktopPet() {
         ipcRenderer.send('pet:dblclick');
       });
 
+      pet.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        ipcRenderer.send('pet:contextmenu');
+      });
+
+      // 状态响应
+      ipcRenderer.on('pet:state', function(_, state) {
+        pet.setAttribute('data-state', state);
+        if (state === 'recording') { bubble.textContent = '录制中...'; bubble.classList.add('show'); }
+        else if (state === 'playing') { bubble.textContent = '执行中...'; bubble.classList.add('show'); }
+        else { bubble.classList.remove('show'); }
+      });
+
       // 气泡轮播
       var msgs = ['点我提问','有什么可以帮你?','Hi ~','今天有什么任务?'];
       var mi = 0;
@@ -3478,6 +3493,7 @@ function createDesktopPet() {
   ipcMain.removeAllListeners('pet:move');
   ipcMain.removeAllListeners('pet:click');
   ipcMain.removeAllListeners('pet:dblclick');
+  ipcMain.removeAllListeners('pet:contextmenu');
 
   ipcMain.on('pet:move', function(_, dx, dy) {
     if (petWindow && !petWindow.isDestroyed()) {
@@ -3495,6 +3511,107 @@ function createDesktopPet() {
       mainWindow.show();
       mainWindow.focus();
     }
+  });
+
+  ipcMain.on('pet:contextmenu', function() {
+    if (macroRecording) {
+      stopMacroRecord();
+    } else if (macroActions.length > 0) {
+      playMacro();
+    } else {
+      startMacroRecord();
+    }
+  });
+}
+
+// ============ 宏录制/回放 ============
+var macroRecording = false;
+var macroActions = [];
+
+function startMacroRecord() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  macroActions = [];
+  macroRecording = true;
+  if (petWindow) petWindow.webContents.send('pet:state', 'recording');
+  mainWindow.webContents.executeJavaScript(`
+    (async function(){
+      var chatView = document.getElementById('chatView');
+      if (!chatView) return;
+      await chatView.executeJavaScript('window.__dpp_record_start = true;');
+    })()
+  `);
+  // 注入录制监听
+  mainWindow.webContents.executeJavaScript(`
+    (async function(){
+      var chatView = document.getElementById('chatView');
+      if (!chatView) return;
+      await chatView.executeJavaScript(
+        '(function(){' +
+        'if(window.__dpp_recorder_active)return;' +
+        'window.__dpp_recorder_active=true;' +
+        'window.__dpp_actions=[];' +
+        'document.addEventListener("click",function(e){' +
+        '  if(!window.__dpp_record_start)return;' +
+        '  var t=e.target;' +
+        '  window.__dpp_actions.push({type:"click",tag:t.tagName,text:(t.textContent||"").trim().slice(0,50),x:e.clientX,y:e.clientY,t:Date.now(),selector:t.id?("#"+t.id):(t.className?("."+t.className.split(" ")[0]):"")});' +
+        '},true);' +
+        'document.addEventListener("keydown",function(e){' +
+        '  if(!window.__dpp_record_start)return;' +
+        '  if(e.target.tagName==="TEXTAREA"||e.target.tagName==="INPUT"){' +
+        '    window.__dpp_actions.push({type:"key",key:e.key,value:e.target.value,t:Date.now()});' +
+        '  }' +
+        '},true);' +
+        '})()'
+      );
+    })()
+  `);
+}
+
+function stopMacroRecord() {
+  macroRecording = false;
+  if (petWindow) petWindow.webContents.send('pet:state', 'idle');
+  mainWindow.webContents.executeJavaScript(`
+    (async function(){
+      var chatView = document.getElementById('chatView');
+      if (!chatView) return;
+      var result = await chatView.executeJavaScript('window.__dpp_actions;window.__dpp_record_start=false;window.__dpp_recorder_active=false;JSON.stringify(window.__dpp_actions||[])');
+      return result;
+    })()
+  `).then(function(actions) {
+    try {
+      if (actions) macroActions = JSON.parse(actions);
+      console.log('[Macro] recorded', macroActions.length, 'actions');
+    } catch(_) {}
+  });
+}
+
+function playMacro() {
+  if (macroActions.length === 0 || !mainWindow || mainWindow.isDestroyed()) return;
+  if (petWindow) petWindow.webContents.send('pet:state', 'playing');
+  mainWindow.webContents.executeJavaScript(`
+    (async function(){
+      var chatView = document.getElementById('chatView');
+      if (!chatView) return;
+      await chatView.executeJavaScript(
+        '(async function(){' +
+        'var actions=' + JSON.stringify(macroActions) + ';' +
+        'for(var i=0;i<actions.length;i++){' +
+        '  var a=actions[i];' +
+        '  await new Promise(function(r){setTimeout(r, a.t?(a.t-Math.min.apply(null,actions.map(function(x){return x.t}))+500):200);});' +
+        '  if(a.type==="click"){' +
+        '    var el=document.querySelector(a.selector)||document.elementFromPoint(a.x,a.y);' +
+        '    if(el){el.click();el.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));el.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));}' +
+        '  }else if(a.type==="key"){' +
+        '    var ta=document.querySelector("textarea");' +
+        '    if(ta){var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;ns.call(ta,a.value);' +
+        '    ta.dispatchEvent(new InputEvent("input",{bubbles:true}));}' +
+        '  }' +
+        '}' +
+        '})()'
+      );
+    })()
+  `).then(function() {
+    if (petWindow) petWindow.webContents.send('pet:state', 'idle');
   });
 }
 
