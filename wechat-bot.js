@@ -368,11 +368,28 @@ async function handleMessages(messages) {
       const result = await callDeepSeekApi(mainWindowRef, text);
 
       if (result.text) {
-        // 精简回复：去掉引言和温馨提示等多余内容
         var cleanText = result.text;
-        cleanText = cleanText.replace(/^(根据|以下是|我来|让我|为您|今天（|今天是|以下为)[^。\n]*[。\n]/g, '');
+        // 找思考结束、实际回答开始的位置
+        var cutPatterns = [
+          '我的回答将涵盖', '可以回答用户的问题了', '将在最终回答中总结',
+          '最终回答可以包括', '回答将涵盖', '来回答用户的问题',
+          '直接回答即可', '任务已经完成', '所以可以直接回答',
+          '我将直接给出', '因此直接回答'
+        ];
+        var cutPos = -1;
+        for (var p = 0; p < cutPatterns.length; p++) {
+          var pos = cleanText.lastIndexOf(cutPatterns[p]);
+          if (pos > cutPos) cutPos = pos;
+        }
+        if (cutPos > 0) {
+          cleanText = cleanText.slice(cutPos).replace(/^[^\n]*\n/, '');
+        }
+        // 去掉行首的引言
+        cleanText = cleanText.replace(/^根据(搜索|查询|天气|最新|实时|气象)[^。\n]*[。，]\s*/g, '');
+        cleanText = cleanText.replace(/^(今天（|今天是|以下为|以下是)[^。\n]*[。\n]/gm, '');
+        // 去掉温馨提示及以后的内容
         cleanText = cleanText.replace(/温馨提示[：:][\s\S]*$/g, '');
-        cleanText = cleanText.replace(/（以上信息[^）]*）/g, '');
+        cleanText = cleanText.replace(/（[^）]*(以上信息|仅供参考|数据来源|具体实时)[^）]*）/g, '');
         cleanText = cleanText.replace(/\n{3,}/g, '\n\n').trim();
         await sendLongMessage(userId, cleanText, ctxToken);
       } else {
