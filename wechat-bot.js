@@ -368,7 +368,13 @@ async function handleMessages(messages) {
       const result = await callDeepSeekApi(mainWindowRef, text);
 
       if (result.text) {
-        await sendLongMessage(userId, result.text, ctxToken);
+        // 精简回复：去掉引言和温馨提示等多余内容
+        var cleanText = result.text;
+        cleanText = cleanText.replace(/^(根据|以下是|我来|让我|为您|今天（|今天是|以下为)[^。\n]*[。\n]/g, '');
+        cleanText = cleanText.replace(/温馨提示[：:][\s\S]*$/g, '');
+        cleanText = cleanText.replace(/（以上信息[^）]*）/g, '');
+        cleanText = cleanText.replace(/\n{3,}/g, '\n\n').trim();
+        await sendLongMessage(userId, cleanText, ctxToken);
       } else {
         await sendMessage(userId, 'AI 未返回有效回复', ctxToken);
       }
