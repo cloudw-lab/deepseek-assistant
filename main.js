@@ -3371,10 +3371,17 @@ let petWindow = null;
 
 function createDesktopPet() {
   if (petWindow && !petWindow.isDestroyed()) return;
-  const petSize = 120;
+
+  // 用 DeepSeek logo
+  const logoPath = path.resolve(__dirname, 'logo.png');
+  const logoBase64 = fs.existsSync(logoPath)
+    ? 'data:image/png;base64,' + fs.readFileSync(logoPath).toString('base64')
+    : '';
+
+  const petSize = 100;
   petWindow = new BrowserWindow({
-    width: petSize + 40,
-    height: petSize + 80,
+    width: petSize + 50,
+    height: petSize + 70,
     x: 100,
     y: 200,
     frame: false,
@@ -3389,16 +3396,15 @@ function createDesktopPet() {
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     * { margin:0; padding:0; }
-    body { background:transparent; overflow:hidden; user-select:none; }
-    .pet { width:${petSize}px; height:${petSize}px; margin:50px 20px 0;
-      cursor:pointer;
-      background:url(data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><ellipse cx="60" cy="50" rx="45" ry="32" fill="#4D6BFE" opacity="0.95"/><ellipse cx="42" cy="42" rx="9" ry="7" fill="#fff" opacity="0.85"/><circle cx="46" cy="41" r="3" fill="#333"/><ellipse cx="52" cy="52" rx="12" ry="6" fill="#2D3BDE"/><circle cx="56" cy="50" r="1.5" fill="#6B7EFF"/><path d="M18 48 Q35 28 60 32 Q85 30 102 48" fill="none" stroke="#3B4FDE" stroke-width="2.5"/><path d="M82 52 Q98 50 108 58" fill="none" stroke="#4D6BFE" stroke-width="3" stroke-linecap="round"/><path d="M88 45 Q95 42 98 38" fill="none" stroke="#4D6BFE" stroke-width="2" stroke-linecap="round" opacity="0.7"/></svg>')}) no-repeat center/contain;
-      animation: swim 4s ease-in-out infinite; }
+    body { background:transparent; overflow:hidden; user-select:none; -webkit-app-region:no-drag; }
+    .pet { width:${petSize}px; height:${petSize}px; margin:45px 25px 0;
+      background:url(${logoBase64}) no-repeat center/contain;
+      animation: swim 4s ease-in-out infinite; border-radius:50%; }
     .bubble { position:absolute; top:2px; left:50%; transform:translateX(-50%);
-      background:rgba(255,255,255,.9); border-radius:10px; padding:3px 8px;
+      background:rgba(255,255,255,.92); border-radius:10px; padding:3px 8px;
       font:11px sans-serif; color:#333; white-space:nowrap; display:none;
       box-shadow:0 1px 6px rgba(0,0,0,.08); pointer-events:none; }
-    .pet:hover ~ .bubble, .bubble.show { display:block; }
+    .bubble.show { display:block; }
     @keyframes swim {
       0%,100% { transform:translateY(0) rotate(-2deg); }
       30% { transform:translateY(-6px) rotate(0deg); }
@@ -3412,20 +3418,22 @@ function createDesktopPet() {
       const { ipcRenderer } = require('electron');
       var pet = document.getElementById('pet');
       var bubble = document.getElementById('bubble');
-      var isDragging = false;
-      var startX, startY;
+      var startX, startY, startTime;
+      var dragged = false;
 
       pet.addEventListener('mousedown', function(e) {
-        isDragging = true;
         startX = e.screenX;
         startY = e.screenY;
+        startTime = Date.now();
+        dragged = false;
       });
 
       document.addEventListener('mousemove', function(e) {
-        if (!isDragging) return;
+        if (startX === undefined) return;
         var dx = e.screenX - startX;
         var dy = e.screenY - startY;
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+          dragged = true;
           ipcRenderer.send('pet:move', dx, dy);
           startX = e.screenX;
           startY = e.screenY;
@@ -3433,32 +3441,35 @@ function createDesktopPet() {
       });
 
       document.addEventListener('mouseup', function(e) {
-        if (isDragging && Math.abs(e.screenX - startX) < 3 && Math.abs(e.screenY - startY) < 3) {
+        var dt = Date.now() - startTime;
+        if (!dragged && dt < 300) {
           ipcRenderer.send('pet:focusChat');
         }
-        isDragging = false;
+        startX = undefined;
       });
 
       // 气泡轮播
-      var msgs = ['点我提问','有什么可以帮你?','Ask me anything!','Hi ~','今天有什么任务?'];
+      var msgs = ['点我提问','有什么可以帮你?','Hi ~','今天有什么任务?'];
       var mi = 0;
-      setInterval(function(){
+      function showBubble() {
         bubble.textContent = msgs[mi % msgs.length];
         bubble.classList.add('show');
         setTimeout(function(){ bubble.classList.remove('show'); }, 4000);
         mi++;
-      }, 10000);
-      // 初始显示3秒
-      bubble.classList.add('show');
-      setTimeout(function(){ bubble.classList.remove('show'); }, 3000);
+      }
+      showBubble();
+      setInterval(showBubble, 12000);
     </script></body></html>`;
 
   petWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 
+  ipcMain.removeAllListeners('pet:move');
+  ipcMain.removeAllListeners('pet:focusChat');
+
   ipcMain.on('pet:move', function(_, dx, dy) {
     if (petWindow && !petWindow.isDestroyed()) {
       var [x, y] = petWindow.getPosition();
-      petWindow.setPosition(x + dx, y + dy);
+      petWindow.setPosition(Math.round(x + dx), Math.round(y + dy));
     }
   });
 
