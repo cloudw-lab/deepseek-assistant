@@ -3607,9 +3607,16 @@ function createMiniChat() {
             return await chatView.executeJavaScript(
               '(function(){var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
               'if(!roots.length)return"";var r=roots[roots.length-1].cloneNode(true);' +
-              'var sels=[".dpp-tool-block",".dpp-agent-container","[class*=tool]","[class*=think]","[class*=reason]"];' +
+              'var sels=[".dpp-tool-block",".dpp-agent-container",".dpp-agent-step","[class*=tool]","[class*=think]","[class*=reason]","[class*=step]"];' +
               'for(var i=0;i<sels.length;i++){var ns=r.querySelectorAll(sels[i]);for(var j=0;j<ns.length;j++)ns[j].remove();}' +
-              'return (r.textContent||"").trim();})()'
+              'var t=(r.textContent||"").trim();' +
+              'var cut=0;var marks=["最终答案","最终结论","最终回答"];' +
+              'for(var m=0;m<marks.length;m++){var idx=t.indexOf(marks[m]);if(idx>=0){t=t.slice(idx+marks[m].length).replace(/^[:：\\s-]*/,"").trim();break;}}' +
+              't=t.replace(/^有两个工具[\\s\\S]*?\\n\\n/,"");' +
+              't=t.replace(/^根据(搜索|查询|最新|实时|气象)[^\\n]*\\n/g,"");' +
+              't=t.replace(/温馨提示[：:][\\s\\S]*$/g,"");' +
+              't=t.replace(/\\n{3,}/g,"\\n\\n").trim();' +
+              'return t;})()'
             );
           })()
         `).then(function(text) {
@@ -3617,7 +3624,7 @@ function createMiniChat() {
             stableCount++;
             if (stableCount >= 3 && miniChatWindow && !miniChatWindow.isDestroyed()) {
               clearInterval(pollTimer);
-              var answer = text.split('\\n').slice(-8).join('\\n').trim();
+              var answer = text.trim();
               miniChatWindow.webContents.send('mini:reply', answer);
             }
           } else if (text) {
