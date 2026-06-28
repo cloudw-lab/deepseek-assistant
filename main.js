@@ -3406,13 +3406,15 @@ function createDesktopPet() {
       box-shadow:0 1px 6px rgba(0,0,0,.08); pointer-events:none; }
     .bubble.show { display:block; }
     @keyframes swim {
-      0%,5%   { transform:translateX(0) scaleX(1); }
-      20%     { transform:translateX(16px) scaleX(1); }
-      35%     { transform:translateX(32px) scaleX(1); }
-      45%     { transform:translateX(32px) scaleX(-1); }
-      55%     { transform:translateX(16px) scaleX(-1); }
-      70%     { transform:translateX(0) scaleX(-1); }
-      80%     { transform:translateX(0) scaleX(1); }
+      0%,5%   { transform:translateX(32px) scaleX(1); }
+      15%     { transform:translateX(16px) scaleX(1); }
+      25%     { transform:translateX(0) scaleX(1); }
+      30%     { transform:translateX(0) scaleX(-1); }
+      40%     { transform:translateX(16px) scaleX(-1); }
+      55%     { transform:translateX(32px) scaleX(-1); }
+      65%     { transform:translateX(32px) scaleX(1); }
+      75%     { transform:translateX(16px) scaleX(1); }
+      90%     { transform:translateX(0) scaleX(1); }
       100%    { transform:translateX(0) scaleX(1); }
     }
   </style></head><body>
