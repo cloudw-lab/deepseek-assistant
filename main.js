@@ -3539,7 +3539,7 @@ function startMacroRecord() {
       if (!chatView) return;
       await chatView.executeJavaScript('window.__dpp_record_start = true;');
     })()
-  `);
+  `).catch(function(){});
   // 注入录制监听
   mainWindow.webContents.executeJavaScript(`
     (async function(){
@@ -3564,7 +3564,7 @@ function startMacroRecord() {
         '})()'
       );
     })()
-  `);
+  `).catch(function(){});
 }
 
 function stopMacroRecord() {
@@ -3573,7 +3573,7 @@ function stopMacroRecord() {
   mainWindow.webContents.executeJavaScript(`
     (async function(){
       var chatView = document.getElementById('chatView');
-      if (!chatView) return;
+      if (!chatView) return '[]';
       var result = await chatView.executeJavaScript('window.__dpp_actions;window.__dpp_record_start=false;window.__dpp_recorder_active=false;JSON.stringify(window.__dpp_actions||[])');
       return result;
     })()
@@ -3612,7 +3612,7 @@ function playMacro() {
     })()
   `).then(function() {
     if (petWindow) petWindow.webContents.send('pet:state', 'idle');
-  });
+  }).catch(function(){});
 }
 
 let miniChatWindow = null;
