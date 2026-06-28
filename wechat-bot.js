@@ -282,12 +282,15 @@ async function callDeepSeekApi(mainWindow, prompt) {
       '  }' +
       '  text=(root.textContent||"").trim();' +
       '}' +
-      'if(text){' +
-      '  var finalMarkers=["最终答案","最终结论","Final Answer","Answer"];' +
+'if(text){' +
+      '  var finalMarkers=["最终答案","最终结论","最终回答","Final Answer","Answer","总结：","总结如下"];' +
       '  for(var fm=0;fm<finalMarkers.length;fm++){' +
       '    var marker=finalMarkers[fm];var idx=text.indexOf(marker);' +
       '    if(idx>=0){text=text.slice(idx+marker.length).replace(/^[:：\\s-]*/,"").trim();break;}' +
       '  }' +
+      '  text=text.replace(/^有两个工具[\\s\\S]*?\\n\\n/,"");' +
+      '  text=text.replace(/^目前有[\\s\\S]*?\\n\\n/,"");' +
+      '  text=text.replace(/^[\\s\\S]*?根据规则[\\s\\S]*?\\n\\n/,"");' +
       '  text=text.replace(/^(已思考|思考中|正在思考|Thinking|Reasoning)[:：\\n\\s-]*[\\s\\S]*?\\n\\n/i,"");' +
       '  text=text.replace(/已执行工具[^\\n]*\\n[\\s\\S]*?\\n\\n/g,"");' +
       '  text=text.replace(/Step\\s*\\d+[^\\n]*\\n[\\s\\S]*?\\n\\n/gi,"");' +
