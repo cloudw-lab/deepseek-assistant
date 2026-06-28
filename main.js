@@ -3584,7 +3584,44 @@ function createMiniChat() {
         `);
       } catch(_) {}
     }
-    miniChatWindow.webContents.send('mini:reply', '已发送到 DeepSeek，请在主窗口查看回复。');
+    // 轮询主窗口最新回复，同步到迷你窗
+    var lastReply = '';
+    var stableCount = 0;
+    var pollTimer = setInterval(function() {
+      if (!mainWindow || mainWindow.isDestroyed() || !miniChatWindow || miniChatWindow.isDestroyed()) {
+        clearInterval(pollTimer);
+        return;
+      }
+      try {
+        mainWindow.webContents.executeJavaScript(`
+          (function(){
+            var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");
+            if(!roots.length)return"";
+            var r=roots[roots.length-1].cloneNode(true);
+            var sels=[".dpp-tool-block",".dpp-agent-container","[class*=tool]","[class*=Tool]","[class*=think]","[class*=Think]","[class*=reason]","[class*=Reason]"];
+            for(var i=0;i<sels.length;i++){var ns=r.querySelectorAll(sels[i]);for(var j=0;j<ns.length;j++)ns[j].remove();}
+            return (r.textContent||"").trim();
+          })()
+        `).then(function(text) {
+          if (text && text.length > 3 && text === lastReply) {
+            stableCount++;
+            if (stableCount >= 3 && miniChatWindow && !miniChatWindow.isDestroyed()) {
+              clearInterval(pollTimer);
+              // 只取最后一段作为回复
+              var lines = text.split(/\\n/);
+              var answer = lines.slice(-10).join('\\n').trim();
+              miniChatWindow.webContents.send('mini:reply', answer);
+            }
+          } else if (text) {
+            lastReply = text;
+            stableCount = 0;
+          }
+        }).catch(function(){});
+      } catch(_) {}
+    }, 2000);
+    // 30秒超时
+    setTimeout(function() { clearInterval(pollTimer); }, 30000);
+    miniChatWindow.webContents.send('mini:reply', '正在查询...');
   });
 
   ipcMain.on('mini:close', function() {
