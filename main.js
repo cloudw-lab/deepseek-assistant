@@ -3619,13 +3619,19 @@ function createMiniChat() {
               clearInterval(pollTimer);
               // 在主进程做过滤，避免regex转义问题
               var answer = text;
-              var marks = ['最终答案','最终结论','最终回答'];
-              for (var m=0;m<marks.length;m++) {
-                var idx = answer.indexOf(marks[m]);
-                if (idx >= 0) { answer = answer.slice(idx+marks[m].length).replace(/^[:\-\s]+/,'').trim(); break; }
+              // 找实际回答起点：最后一个"根据搜索"或"为您整理"
+              var starts = [];
+              ['根据搜索结果','根据查询结果','为您整理了','为您整理','以下是','以下为'].forEach(function(p){
+                var pos = answer.lastIndexOf(p);
+                if (pos > 0) starts.push(pos);
+              });
+              if (starts.length > 0) {
+                var start = Math.max.apply(null, starts);
+                answer = answer.slice(start);
               }
-              answer = answer.replace(/^有两个工具[\s\S]*?\n\n/,'');
-              answer = answer.replace(/^根据(搜索|查询|最新|实时|气象)[^\n]*\n/g,'');
+              // 去思维导语
+              answer = answer.replace(/^根据(搜索|查询)结果[，,]\s*[^。\n]{0,20}[。\n]/,'');
+              answer = answer.replace(/^我(打算|需要|可以|帮你|来)[^。\n]*[。\n]/g,'');
               answer = answer.replace(/温馨提示[：:][\s\S]*$/g,'');
               answer = answer.replace(/\n{3,}/g,'\n\n').trim();
               miniChatWindow.webContents.send('mini:reply', answer);
