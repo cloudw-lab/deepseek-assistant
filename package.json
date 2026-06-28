@@ -1,0 +1,94 @@
+{
+  "name": "deepseek-desktop",
+  "version": "1.0.0",
+  "description": "DeepSeek 桌面客户端（集成 deepseek-pp 完整功能）",
+  "main": "main.js",
+  "scripts": {
+    "prepare:extension": "node scripts/prepare-extension.mjs",
+    "prepare:python-runtime": "node scripts/prepare-python-runtime.mjs",
+    "install:project-browser": "node scripts/install-browser.mjs",
+    "start": "npm run start:launcher",
+    "start:launcher": "npm run prepare:extension && electron .",
+    "start:full": "npm run prepare:extension && node scripts/launch-chrome-full.mjs",
+    "start:electron": "npm run start:launcher",
+    "build": "npm run prepare:extension && npm run prepare:python-runtime && electron-builder",
+    "build:win": "npm run prepare:extension && electron-builder --win",
+    "build:mac": "npm run prepare:extension && npm run prepare:python-runtime && electron-builder --mac"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.example.deepseek-desktop",
+    "productName": "DeepSeek Desktop",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "webview-preload.js",
+      "background-preload.js",
+      "sidepanel-preload.js",
+      "wechat-bot.js",
+      "app-shell.html",
+      "app-shell-renderer.js",
+      "launcher.html",
+      "launcher-renderer.js",
+      "scripts/**/*",
+      "extension/**/*",
+      "shell-host-bin/**/*",
+      "node_modules/**/*",
+      "!runtime/**/*",
+      "vc_redist.x64.exe"
+    ],
+    "asarUnpack": [
+      "shell-host-bin/**/*",
+      "runtime/python/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "icon": "build/app-icon-1024.png",
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "include": "installer.nsh"
+    },
+    "extraResources": [
+      {
+        "from": "build/vc_redist.x64.exe",
+        "to": "vc_redist.x64.exe",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  }
+}

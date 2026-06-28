@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DeepSeek Desktop</title>
+    <style>
+      :root {
+        --bg: #f3f6fb;
+        --panel: #ffffff;
+        --panel-2: #f8fafc;
+        --line: #d9e1ec;
+        --text: #102033;
+        --sub: #5f7186;
+        --accent: #1668e3;
+        --accent-2: #e9f1ff;
+        --ok: #0f766e;
+        --danger: #c2410c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "PingFang SC", "SF Pro Display", "Noto Sans SC", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 0 0, rgba(22, 104, 227, 0.10), transparent 28%),
+          linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 1fr;
+        min-height: 100vh;
+        transition: grid-template-columns 0.25s ease;
+      }
+      .app.sidepanel-open {
+        grid-template-columns: 1fr 380px;
+      }
+      .main {
+        padding: 14px;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .panel {
+        display: none;
+        flex: 1;
+        min-height: 0;
+      }
+      .panel.active {
+        display: grid;
+      }
+      .chat-panel {
+        grid-template-rows: auto 1fr;
+        gap: 10px;
+      }
+      .toolbar,
+      .shell-head,
+      .runtime-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255,255,255,0.84);
+      }
+      .toolbar h2,
+      .shell-head h2,
+      .runtime-head h2 {
+        margin: 0;
+        font-size: 18px;
+      }
+      .toolbar p,
+      .shell-head p,
+      .runtime-head p {
+        margin: 4px 0 0;
+        color: var(--sub);
+        font-size: 12px;
+      }
+      .toolbar-actions,
+      .head-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .panel-switches {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      button {
+        border: 1px solid #bfd2ea;
+        background: #fff;
+        color: var(--text);
+        padding: 8px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      button.accent-outline {
+        background: var(--accent-2);
+        border-color: #c8dafb;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      button.panel-tab.active {
+        background: var(--accent-2);
+        border-color: #c8dafb;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+      .browser-wrap {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        overflow: hidden;
+        background: var(--panel);
+        min-height: 0;
+        flex: 1;
+      }
+      webview {
+        display: inline-flex;
+        width: 100%;
+        height: 100%;
+        min-height: 100%;
+      }
+      .shell-panel,
+      .runtime-panel {
+        grid-template-rows: auto 1fr;
+        gap: 10px;
+      }
+      .shell-layout,
+      .runtime-layout {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 10px;
+        min-height: 0;
+      }
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--panel);
+        padding: 14px;
+      }
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+      }
+      .meta-grid { display: grid; gap: 8px; }
+      .meta-row strong,
+      .status-grid strong {
+        display: block;
+        font-size: 11px;
+        color: var(--sub);
+        margin-bottom: 3px;
+      }
+      .meta-row span,
+      .status-grid span {
+        font-size: 12px;
+        word-break: break-all;
+      }
+      .shell-console {
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        gap: 8px;
+        min-height: 0;
+      }
+      .shell-console textarea,
+      .shell-console input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        font: inherit;
+        resize: vertical;
+        background: #fbfdff;
+      }
+      .shell-console textarea { min-height: 100px; }
+      .console-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      .output {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #0f172a;
+        color: #d7e0ea;
+        padding: 12px;
+        margin: 0;
+        overflow: auto;
+        white-space: pre-wrap;
+        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .runtime-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        align-content: start;
+      }
+      .status-ok { color: var(--ok); font-weight: 700; }
+      .status-danger { color: var(--danger); font-weight: 700; }
+      .status-warn { color: #92400e; font-weight: 700; }
+      .runtime-log {
+        margin-top: 10px;
+        min-height: 44px;
+        border: 1px dashed var(--line);
+        border-radius: 12px;
+        background: var(--panel-2);
+        padding: 10px;
+        color: var(--sub);
+        font-size: 12px;
+      }
+      /* 扩展侧边栏 */
+      .sidepanel {
+        background: var(--panel);
+        display: none;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+        position: relative;
+        margin-left: -1px;
+      }
+      .sidepanel.open {
+        display: flex;
+      }
+      .sidepanel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel-2);
+      }
+      .sidepanel-head span {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .sidepanel-head button {
+        border: none;
+        background: transparent;
+        font-size: 18px;
+        padding: 2px 6px;
+        cursor: pointer;
+        color: var(--sub);
+      }
+      .sidepanel-wrap {
+        flex: 1;
+        min-height: 0;
+        border-radius: 0;
+        overflow: hidden;
+      }
+      .sidepanel-wrap webview {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+      }
+      @media (max-width: 1180px) {
+        .app { grid-template-columns: 1fr; }
+        .app.sidepanel-open { grid-template-columns: 1fr; }
+        .shell-layout, .runtime-layout { grid-template-columns: 1fr; }
+        .sidepanel { position: fixed; right: 0; top: 0; bottom: 0; width: 360px; z-index: 100; box-shadow: -4px 0 24px rgba(0,0,0,0.08); }
+      }
+      /* 微信机器人 */
+      .wechat-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 200;
+        background: rgba(0,0,0,0.45);
+        justify-content: center;
+        align-items: center;
+      }
+      .wechat-overlay.open { display: flex; }
+      .wechat-dialog {
+        background: #fff;
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 360px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 12px 48px rgba(0,0,0,0.15);
+      }
+      .wechat-dialog h3 { margin: 0 0 12px; font-size: 16px; }
+      .wechat-dialog .status-text { color: var(--sub); font-size: 13px; margin-bottom: 12px; }
+      .wechat-dialog img { max-width: 240px; border-radius: 10px; }
+      .wechat-dialog .btn-row { margin-top: 14px; display: flex; gap: 8px; justify-content: center; }
+      .wechat-dialog .error-text { color: var(--danger); font-size: 12px; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <div class="app" id="appLayout">
+      <main class="main">
+        <!-- Background 不再使用独立 webview, background.js 在 chat webview preload 中共驻运行 -->
+
+        <section id="chatPanel" class="panel chat-panel active">
+          <div class="toolbar">
+            <div>
+              <h2>聊天</h2>
+              <p>DeepSeek 网页版 + 扩展功能内嵌</p>
+            </div>
+            <div class="toolbar-actions">
+              <div class="panel-switches">
+                <button class="panel-tab active" data-panel="chat">聊天</button>
+              </div>
+              <button id="reloadChatBtn">重载聊天页</button>
+              <button id="wechatBotBtn" class="accent-outline" title="微信机器人">微信机器人</button>
+              <button id="toggleSidepanelBtn" class="accent-outline">扩展面板</button>
+            </div>
+          </div>
+          <div class="browser-wrap">
+            <webview id="chatView" src="about:blank" allowpopups webpreferences="contextIsolation=yes" preload="webview-preload.js"></webview>
+          </div>
+        </section>
+
+        <section id="shellPanel" class="panel shell-panel" hidden>
+          <div class="shell-head">
+            <div>
+              <h2>本地 Shell</h2>
+              <p>内置本地命令执行能力</p>
+            </div>
+            <div class="head-actions">
+              <div class="panel-switches">
+                <button class="panel-tab" data-panel="chat">聊天</button>
+                <button class="panel-tab active" data-panel="shell">本地 Shell</button>
+                <button class="panel-tab" data-panel="runtime">运行时</button>
+              </div>
+              <button id="shellRefreshBtn">刷新状态</button>
+              <button id="shellRunBtn" class="primary">执行命令</button>
+            </div>
+          </div>
+          <div class="shell-layout">
+            <div class="card">
+              <h3>运行环境</h3>
+              <div id="shellMeta" class="meta-grid"></div>
+            </div>
+            <div class="card shell-console">
+              <input id="shellCwdInput" placeholder="工作目录，默认用户主目录" />
+              <textarea id="shellCommandInput" placeholder="输入要执行的命令，例如：pwd&#10;ls"></textarea>
+              <div class="console-actions">
+                <span id="shellHint" class="status-warn">默认 shell 已内置在应用中。</span>
+                <div><button id="shellClearBtn">清空输出</button></div>
+              </div>
+              <pre id="shellOutput" class="output">准备就绪。</pre>
+            </div>
+          </div>
+        </section>
+
+        <section id="runtimePanel" class="panel runtime-panel" hidden>
+          <div class="runtime-head">
+            <div>
+              <h2>运行时</h2>
+              <p>兼容层状态</p>
+            </div>
+            <div class="head-actions">
+              <div class="panel-switches">
+                <button class="panel-tab" data-panel="chat">聊天</button>
+                <button class="panel-tab" data-panel="shell">本地 Shell</button>
+                <button class="panel-tab active" data-panel="runtime">运行时</button>
+              </div>
+              <button id="runtimeRefreshBtn">刷新状态</button>
+              <button id="runtimeFixBtn" class="primary">一键修复</button>
+            </div>
+          </div>
+          <div class="runtime-layout">
+            <div class="card">
+              <h3>操作</h3>
+              <div class="meta-grid">
+                <button id="runtimeInstallBrowserBtn">安装项目内置 Chrome</button>
+                <button id="runtimeInstallShellBtn">安装 Shell Native Host</button>
+                <button id="runtimeSyncBtn">同步扩展</button>
+                <button id="runtimeLaunchBtn" class="primary">启动兼容模式</button>
+                <button id="runtimeOpenExtBtn">打开扩展目录</button>
+                <button id="runtimeOpenProfileBtn">打开配置目录</button>
+              </div>
+              <div id="runtimeLog" class="runtime-log">准备就绪。</div>
+            </div>
+            <div class="runtime-grid" id="runtimeStatusGrid"></div>
+          </div>
+        </section>
+      </main>
+
+      <!-- 扩展侧边栏 (右侧可收起面板) -->
+      <aside class="sidepanel" id="sidepanelPanel">
+        <div class="sidepanel-head">
+          <span>DeepSeek++ 面板</span>
+          <button id="closeSidepanelBtn" title="关闭">×</button>
+        </div>
+        <div class="sidepanel-wrap">
+          <webview id="sidepanelView" src="about:blank" preload="sidepanel-preload.js"></webview>
+        </div>
+      </aside>
+    </div>
+    <!-- 微信机器人扫码弹窗 -->
+    <div class="wechat-overlay" id="wechatOverlay">
+      <div class="wechat-dialog">
+        <h3>微信机器人</h3>
+        <div id="wechatStatus" class="status-text">未启动</div>
+        <img id="wechatQrImg" alt="QR Code" style="display:none" />
+        <div id="wechatError" class="error-text"></div>
+        <div class="btn-row">
+          <button id="wechatStartBtn" class="primary">启动机器人</button>
+          <button id="wechatStopBtn" style="display:none">停止</button>
+          <button id="wechatCloseBtn">关闭</button>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--sub);text-align:center">
+          扫码登录后，通过个人微信与 DeepSeek 对话
+        </div>
+      </div>
+    </div>
+    <script src="./app-shell-renderer.js"></script>
+  </body>
+</html>

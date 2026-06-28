@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DeepSeek Client Launcher</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg-1: #f7f7f8;
+        --bg-2: #ffffff;
+        --line: #e5e7eb;
+        --text: #111827;
+        --sub: #6b7280;
+        --ok: #0f766e;
+        --warn: #92400e;
+        --danger: #b91c1c;
+        --accent: #111827;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: "PingFang SC", "Noto Sans SC", "Helvetica Neue", sans-serif;
+        color: var(--text);
+        background: radial-gradient(circle at 10% 0%, #f0f9ff, transparent 35%), var(--bg-1);
+      }
+
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .hero {
+        background: linear-gradient(140deg, #ffffff, #f8fafc);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 20px;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+      }
+
+      .sub {
+        margin-top: 10px;
+        color: var(--sub);
+        line-height: 1.6;
+      }
+
+      .grid {
+        margin-top: 18px;
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .card {
+        background: var(--bg-2);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+      }
+
+      .card h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        color: var(--sub);
+        font-weight: 600;
+      }
+
+      .value {
+        font-size: 13px;
+        line-height: 1.5;
+        word-break: break-all;
+      }
+
+      .status-ok { color: var(--ok); font-weight: 600; }
+      .status-warn { color: var(--warn); font-weight: 600; }
+      .status-danger { color: var(--danger); font-weight: 600; }
+
+      .actions {
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .checklist {
+        margin-top: 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #ffffff;
+        padding: 12px 14px;
+      }
+
+      .checklist h3 {
+        margin: 0;
+        font-size: 14px;
+        color: var(--sub);
+        font-weight: 700;
+      }
+
+      .checklist p {
+        margin: 8px 0 0;
+        color: var(--sub);
+        font-size: 12px;
+      }
+
+      .checklist ul {
+        list-style: none;
+        margin: 10px 0 0;
+        padding: 0;
+        display: grid;
+        gap: 8px;
+      }
+
+      .check-item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+
+      .check-item strong {
+        display: block;
+        font-size: 13px;
+      }
+
+      .check-item span {
+        display: block;
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--sub);
+        word-break: break-all;
+      }
+
+      button {
+        border: 1px solid #111827;
+        background: #111827;
+        color: #ffffff;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        background: #ffffff;
+        color: #111827;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .log {
+        margin-top: 14px;
+        border: 1px dashed var(--line);
+        border-radius: 12px;
+        background: #ffffff;
+        min-height: 52px;
+        padding: 10px 12px;
+        color: var(--sub);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      @media (max-width: 760px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="hero">
+        <h1 class="title">DeepSeek 桌面启动器</h1>
+        <p class="sub">
+          这是完整功能运行入口。点击“同步扩展”后再“启动全功能模式”，会以独立 Chrome/Edge 配置目录加载 DeepSeek++ 并打开 DeepSeek。
+        </p>
+
+        <div class="grid">
+          <article class="card">
+            <h3>项目内置 Chrome</h3>
+            <div id="projectBrowserStatus" class="value">-</div>
+            <div id="projectBrowserPath" class="value">-</div>
+          </article>
+          <article class="card">
+            <h3>浏览器检测</h3>
+            <div id="browserStatus" class="value">-</div>
+            <div id="browserPath" class="value">-</div>
+          </article>
+          <article class="card">
+            <h3>扩展目录</h3>
+            <div id="extensionStatus" class="value">-</div>
+            <div id="extensionPath" class="value">-</div>
+          </article>
+          <article class="card">
+            <h3>Shell Native Host</h3>
+            <div id="shellStatus" class="value">-</div>
+            <div id="shellPath" class="value">-</div>
+          </article>
+          <article class="card">
+            <h3>源码构建产物</h3>
+            <div id="sourceStatus" class="value">-</div>
+            <div id="sourceDist" class="value">-</div>
+          </article>
+          <article class="card">
+            <h3>运行配置</h3>
+            <div id="profilePath" class="value">-</div>
+            <div id="targetUrl" class="value">-</div>
+          </article>
+        </div>
+
+        <div class="actions">
+          <button id="refreshBtn" class="secondary">刷新状态</button>
+          <button id="checkBtn" class="secondary">首启自检</button>
+          <button id="fixBtn" class="secondary">一键修复</button>
+          <button id="installBrowserBtn" class="secondary">安装项目内置 Chrome</button>
+          <button id="installShellBtn" class="secondary">安装 Shell Native Host</button>
+          <button id="syncBtn" class="secondary">同步扩展</button>
+          <button id="launchBtn">启动全功能模式</button>
+          <button id="openExtBtn" class="secondary">打开扩展目录</button>
+          <button id="openRuntimeBtn" class="secondary">打开 runtime 目录</button>
+          <button id="openProfileBtn" class="secondary">打开配置目录</button>
+          <button id="openRepoBtn" class="secondary">打开 DeepSeek++ 仓库</button>
+          <button id="resetIdBtn" class="secondary" title="重置已保存的扩展 ID，下次启动时重新检测">重置扩展 ID</button>
+        </div>
+
+        <section class="checklist">
+          <h3>首启自检</h3>
+          <p id="checkSummary">尚未执行自检。</p>
+          <ul id="checkList"></ul>
+        </section>
+
+        <div id="log" class="log">准备就绪。</div>
+      </section>
+    </main>
+
+    <script src="./launcher-renderer.js"></script>
+  </body>
+</html>
