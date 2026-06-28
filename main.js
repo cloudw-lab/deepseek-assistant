@@ -3602,8 +3602,8 @@ function createMiniChat() {
             return await chatView.executeJavaScript(
               '(function(){var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
               'if(!roots.length)return"";var r=roots[roots.length-1].cloneNode(true);' +
-              'var sels=[".dpp-tool-block",".dpp-agent-container","[class*=tool]","[class*=think]","[class*=reason]"];' +
-              'for(var i=0;i<sels.length;i++){var ns=r.querySelectorAll(sels[i]);for(var j=0;j<ns.length;j++)ns[j].remove();}' +
+              'var nodes=r.querySelectorAll(".dpp-tool-block,.dpp-agent-container");' +
+              'for(var i=0;i<nodes.length;i++)nodes[i].remove();' +
               'return (r.textContent||"").trim();})()'
             );
           })()
@@ -3618,7 +3618,7 @@ function createMiniChat() {
           miniChatWindow.webContents.send('mini:reply', '(出错: ' + (e.message||'') + ')');
         });
       } catch(_) {}
-    }, 15000);
+    }, 25000);
     if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '正在查询...');
   });
 
