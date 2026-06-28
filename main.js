@@ -3372,8 +3372,8 @@ let petWindow = null;
 function createDesktopPet() {
   if (petWindow && !petWindow.isDestroyed()) return;
 
-  // 用 logo.png，裁剪掉文字部分（只保留左侧鲸鱼图标 ~165px）
-  const logoPath = path.resolve(__dirname, 'logo.png');
+  // 用截图的小鲸鱼
+  const logoPath = path.resolve(__dirname, 'pet-whale.png');
   const logoB64 = fs.existsSync(logoPath)
     ? 'data:image/png;base64,' + fs.readFileSync(logoPath).toString('base64')
     : '';
@@ -3398,7 +3398,7 @@ function createDesktopPet() {
     * { margin:0; padding:0; }
     body { background:transparent; overflow:hidden; user-select:none; -webkit-app-region:no-drag; }
     .pet { width:${petSize}px; height:${petSize}px; margin:30px 30px 0;
-      background:url(${logoB64}) no-repeat left center/auto 100%;
+      background:url(${logoB64}) no-repeat center/contain;
       animation: swim 6s ease-in-out infinite; border-radius:50%; }
     .bubble { position:absolute; top:2px; left:50%; transform:translateX(-50%);
       background:rgba(255,255,255,.92); border-radius:10px; padding:3px 10px;
