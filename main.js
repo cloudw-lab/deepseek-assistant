@@ -3409,6 +3409,10 @@ function createDesktopPet() {
     .bubble.show { display:block; }
     .pet[data-state="recording"] { animation: swim 1s ease-in-out infinite; filter: drop-shadow(0 0 8px red); }
     .pet[data-state="playing"] { animation: swim 0.6s ease-in-out infinite; filter: drop-shadow(0 0 8px #22c55e); }
+    .close-btn { position:absolute; top:18px; right:22px; width:18px; height:18px;
+      background:rgba(0,0,0,.4); border-radius:50%; color:#fff; font-size:11px;
+      line-height:18px; text-align:center; cursor:pointer; opacity:0; transition:opacity .2s; }
+    body:hover .close-btn { opacity:1; }
     @keyframes swim {
       0%,5%   { transform:translateX(32px) scaleX(1); }
       15%     { transform:translateX(16px) scaleX(1); }
@@ -3423,6 +3427,7 @@ function createDesktopPet() {
     }
   </style></head><body>
     <div class="pet" id="pet"></div>
+    <div class="close-btn" id="closeBtn">✕</div>
     <div class="bubble" id="bubble">点我提问</div>
     <script>
       const { ipcRenderer } = require('electron');
@@ -3430,6 +3435,11 @@ function createDesktopPet() {
       var bubble = document.getElementById('bubble');
       var startX, startY, startTime;
       var dragged = false;
+
+      document.getElementById('closeBtn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        ipcRenderer.send('pet:close');
+      });
 
       pet.addEventListener('mousedown', function(e) {
         startX = e.screenX;
@@ -3496,6 +3506,7 @@ function createDesktopPet() {
   ipcMain.removeAllListeners('pet:click');
   ipcMain.removeAllListeners('pet:dblclick');
   ipcMain.removeAllListeners('pet:contextmenu');
+  ipcMain.removeAllListeners('pet:close');
 
   ipcMain.on('pet:move', function(_, dx, dy) {
     if (petWindow && !petWindow.isDestroyed()) {
@@ -3522,6 +3533,17 @@ function createDesktopPet() {
       playMacro();
     } else {
       startMacroRecord();
+    }
+  });
+
+  ipcMain.on('pet:close', function() {
+    if (petWindow && !petWindow.isDestroyed()) {
+      petWindow.close();
+      petWindow = null;
+    }
+    if (miniChatWindow && !miniChatWindow.isDestroyed()) {
+      miniChatWindow.close();
+      miniChatWindow = null;
     }
   });
 }
