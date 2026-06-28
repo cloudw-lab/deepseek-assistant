@@ -3448,10 +3448,16 @@ function createDesktopPet() {
 
       document.addEventListener('mouseup', function(e) {
         var dt = Date.now() - startTime;
-        if (!dragged && dt < 300) {
-          ipcRenderer.send('pet:focusChat');
+        if (!dragged) {
+          if (dt < 300) {
+            ipcRenderer.send('pet:click');
+          }
         }
         startX = undefined;
+      });
+
+      pet.addEventListener('dblclick', function(e) {
+        ipcRenderer.send('pet:dblclick');
       });
 
       // 气泡轮播
@@ -3470,7 +3476,8 @@ function createDesktopPet() {
   petWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 
   ipcMain.removeAllListeners('pet:move');
-  ipcMain.removeAllListeners('pet:focusChat');
+  ipcMain.removeAllListeners('pet:click');
+  ipcMain.removeAllListeners('pet:dblclick');
 
   ipcMain.on('pet:move', function(_, dx, dy) {
     if (petWindow && !petWindow.isDestroyed()) {
@@ -3479,19 +3486,109 @@ function createDesktopPet() {
     }
   });
 
-  ipcMain.on('pet:focusChat', function() {
+  ipcMain.on('pet:click', function() {
+    createMiniChat();
+  });
+
+  ipcMain.on('pet:dblclick', function() {
     if (mainWindow) {
       mainWindow.show();
       mainWindow.focus();
+    }
+  });
+}
+
+let miniChatWindow = null;
+
+function createMiniChat() {
+  if (miniChatWindow && !miniChatWindow.isDestroyed()) {
+    miniChatWindow.show();
+    miniChatWindow.focus();
+    return;
+  }
+  miniChatWindow = new BrowserWindow({
+    width: 420,
+    height: 320,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: true,
+    skipTaskbar: true,
+    webPreferences: { nodeIntegration: true, contextIsolation: false },
+  });
+  miniChatWindow.setVisibleOnAllWorkspaces(true);
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:rgba(30,30,30,.92); border-radius:16px; overflow:hidden;
+      font:13px/1.5 -apple-system,sans-serif; color:#e0e0e0; display:flex; flex-direction:column; height:100vh; }
+    .header { padding:8px 14px; display:flex; justify-content:space-between; align-items:center;
+      border-bottom:1px solid rgba(255,255,255,.08); -webkit-app-region:drag; }
+    .header span { font-size:12px; color:#999; }
+    .header button { background:none; border:none; color:#666; cursor:pointer; font-size:14px; -webkit-app-region:no-drag; }
+    .msgs { flex:1; overflow-y:auto; padding:12px; }
+    .input-row { display:flex; padding:8px 12px; gap:8px; border-top:1px solid rgba(255,255,255,.08); }
+    .input-row input { flex:1; background:rgba(255,255,255,.1); border:none; border-radius:8px;
+      padding:8px 12px; color:#fff; outline:none; }
+    .input-row button { background:#4D6BFE; border:none; border-radius:8px; padding:8px 14px;
+      color:#fff; cursor:pointer; font-weight:600; }
+  </style></head><body>
+    <div class="header">
+      <span>快速提问</span>
+      <button onclick="closeWin()">✕</button>
+    </div>
+    <div class="msgs" id="msgs"></div>
+    <div class="input-row">
+      <input id="q" placeholder="输入问题..." onkeydown="if(event.key==='Enter')ask()">
+      <button onclick="ask()">发送</button>
+    </div>
+    <script>
+      const { ipcRenderer } = require('electron');
+      function ask() {
+        var q = document.getElementById('q').value.trim();
+        if (!q) return;
+        document.getElementById('msgs').innerHTML += '<div style="text-align:right;color:#4D6BFE;margin:4px 0">'+q+'</div>';
+        document.getElementById('q').value = '';
+        ipcRenderer.send('mini:ask', q);
+      }
+      function closeWin() { ipcRenderer.send('mini:close'); }
+      ipcRenderer.on('mini:reply', function(_, text) {
+        document.getElementById('msgs').innerHTML += '<div style="margin:4px 0">'+text+'</div>';
+        document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
+      });
+    </script></body></html>`;
+
+  miniChatWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  miniChatWindow.on('closed', function() { miniChatWindow = null; });
+
+  ipcMain.removeAllListeners('mini:ask');
+  ipcMain.removeAllListeners('mini:close');
+
+  ipcMain.on('mini:ask', function(_, question) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       try {
         mainWindow.webContents.executeJavaScript(`
           (function(){
             var ta=document.querySelector('textarea');
-            if(ta)ta.focus();
+            if(!ta)return;
+            var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;
+            ns.call(ta,${JSON.stringify(question)});
+            ta.dispatchEvent(new InputEvent("input",{bubbles:true}));
+            var btns=document.querySelectorAll("button");
+            for(var i=btns.length-1;i>=0;i--){
+              if(!btns[i].disabled&&btns[i].offsetParent){
+                btns[i].click();break;
+              }
+            }
           })()
         `);
       } catch(_) {}
     }
+    miniChatWindow.webContents.send('mini:reply', '已发送到 DeepSeek，请在主窗口查看回复。');
+  });
+
+  ipcMain.on('mini:close', function() {
+    if (miniChatWindow) { miniChatWindow.close(); miniChatWindow = null; }
   });
 }
 
