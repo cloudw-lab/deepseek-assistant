@@ -3372,10 +3372,10 @@ let petWindow = null;
 function createDesktopPet() {
   if (petWindow && !petWindow.isDestroyed()) return;
 
-  // 用扩展的鲸鱼精灵图（无文字），只显示 idle 状态
-  const spritePath = path.resolve(__dirname, 'extension/chrome-mv3/pet/deepseek-whale-pet-states.png');
-  const spriteBase64 = fs.existsSync(spritePath)
-    ? 'data:image/png;base64,' + fs.readFileSync(spritePath).toString('base64')
+  // 用 logo.png，裁剪掉文字部分（只保留左侧鲸鱼图标 ~165px）
+  const logoPath = path.resolve(__dirname, 'logo.png');
+  const logoB64 = fs.existsSync(logoPath)
+    ? 'data:image/png;base64,' + fs.readFileSync(logoPath).toString('base64')
     : '';
 
   const petSize = 120;
@@ -3398,8 +3398,7 @@ function createDesktopPet() {
     * { margin:0; padding:0; }
     body { background:transparent; overflow:hidden; user-select:none; -webkit-app-region:no-drag; }
     .pet { width:${petSize}px; height:${petSize}px; margin:30px 30px 0;
-      background:url(${spriteBase64}) no-repeat;
-      background-size:400% 200%; background-position:0% 0%;
+      background:url(${logoB64}) no-repeat left center/auto 100%;
       animation: swim 6s ease-in-out infinite; border-radius:50%; }
     .bubble { position:absolute; top:2px; left:50%; transform:translateX(-50%);
       background:rgba(255,255,255,.92); border-radius:10px; padding:3px 10px;
