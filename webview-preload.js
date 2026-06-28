@@ -24,9 +24,6 @@ const nativeFetch = typeof fetch === 'function' ? fetch.bind(globalThis) : null;
 // 暴露原始 fetch 供 wechat-bot 通过 executeJavaScript 调用，绕过预载拦截
 if (nativeFetch) {
   window.__deepseekNativeFetch = nativeFetch;
-  console.log('[webview-preload] fetch override ACTIVE');
-} else {
-  console.log('[webview-preload] fetch override SKIPPED - nativeFetch is null');
 }
 var extensionFileBaseUrl = null;
 
@@ -95,43 +92,31 @@ function decodeBase64ToUint8Array(base64) {
 if (nativeFetch) {
   globalThis.fetch = function(input, init) {
     var url = typeof input === 'string' ? input : (input && input.url) || '';
-    if (!isDeepSeekApiUrl(url) && !isBingSearchUrl(url)) {
-      return nativeFetch(input, init);
-    }
 
-    console.log('[webview-preload] fetch proxy:', (init && init.method) || 'GET', url.slice(0, 100));
-
-    var headers = headersToObject(init && init.headers ? init.headers : (input && input.headers ? input.headers : undefined));
-    var body = init && Object.prototype.hasOwnProperty.call(init, 'body') ? init.body : undefined;
-    if (body != null && typeof body !== 'string' && !(body instanceof Uint8Array)) {
-      body = String(body);
-    }
-
-    var channel = isBingSearchUrl(url) ? 'app:fetchBingDiagnostic' : 'app:fetchDeepSeekApi';
-
-    return ipcRenderer.invoke(channel, {
-      url: url,
-      method: (init && init.method) || (input && input.method) || 'GET',
-      headers: headers,
-      body: body,
-    }).then(function(result) {
-      if (isBingSearchUrl(url)) {
+    if (isBingSearchUrl(url)) {
+      var headers = headersToObject(init && init.headers ? init.headers : (input && input.headers ? input.headers : undefined));
+      var body = init && Object.prototype.hasOwnProperty.call(init, 'body') ? init.body : undefined;
+      if (body != null && typeof body !== 'string' && !(body instanceof Uint8Array)) {
+        body = String(body);
+      }
+      return ipcRenderer.invoke('app:fetchBingDiagnostic', {
+        url: url,
+        method: (init && init.method) || (input && input.method) || 'GET',
+        headers: headers,
+        body: body,
+      }).then(function(result) {
         return new Response(result.bodyText || '', {
           status: result.status,
           statusText: result.statusText,
           headers: { 'content-type': 'text/html; charset=utf-8' },
         });
-      }
-      var bodyBytes = decodeBase64ToUint8Array(result.bodyBase64 || '');
-      return new Response(bodyBytes, {
-        status: result.status,
-        statusText: result.statusText,
-        headers: result.headers || {},
+      }).catch(function(err) {
+        console.error('[webview-preload] Bing proxy failed:', err.message);
+        throw err;
       });
-    }).catch(function(err) {
-      console.error('[webview-preload] DeepSeek API proxy fetch failed:', err && err.message ? err.message : String(err), url);
-      throw err;
-    });
+    }
+
+    return nativeFetch(input, init);
   };
 }
 
