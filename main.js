@@ -3577,9 +3577,14 @@ function createMiniChat() {
               'var ta=document.querySelector("textarea");if(!ta)return;' +
               'var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;' +
               'ns.call(ta,"");ns.call(ta,p);ta.focus();' +
-              'ta.dispatchEvent(new InputEvent("input",{bubbles:true}));' +
-              'var btns=document.querySelectorAll("button");' +
-              'for(var i=btns.length-1;i>=0;i--){if(!btns[i].disabled&&btns[i].offsetParent){btns[i].click();break;}}' +
+              'ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:p}));' +
+              'ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:p}));' +
+              'ta.dispatchEvent(new Event("change",{bubbles:true}));' +
+              'var btns=document.querySelectorAll("button");var sBtn=null;' +
+              'for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("发送")>=0||txt==="send"||txt==="发送"){sBtn=b;break;}}' +
+              'if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}' +
+              'if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}' +
+              'ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));' +
               '})()'
             );
           })()
