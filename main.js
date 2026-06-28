@@ -3591,14 +3591,9 @@ function createMiniChat() {
         `);
       } catch(_) {}
     }
-    // 轮询主窗口最新回复
-    var lastReply = '';
-    var stableCount = 0;
-    var pollTimer = setInterval(function() {
-      if (!mainWindow || mainWindow.isDestroyed() || !miniChatWindow || miniChatWindow.isDestroyed()) {
-        clearInterval(pollTimer);
-        return;
-      }
+    // 等15秒后取回复
+    setTimeout(function() {
+      if (!mainWindow || mainWindow.isDestroyed() || !miniChatWindow || miniChatWindow.isDestroyed()) return;
       try {
         mainWindow.webContents.executeJavaScript(`
           (async function(){
@@ -3607,30 +3602,23 @@ function createMiniChat() {
             return await chatView.executeJavaScript(
               '(function(){var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
               'if(!roots.length)return"";var r=roots[roots.length-1].cloneNode(true);' +
-              'var sels=[".dpp-tool-block",".dpp-agent-container",".dpp-agent-step","[class*=tool]","[class*=think]","[class*=reason]","[class*=step]"];' +
+              'var sels=[".dpp-tool-block",".dpp-agent-container","[class*=tool]","[class*=think]","[class*=reason]"];' +
               'for(var i=0;i<sels.length;i++){var ns=r.querySelectorAll(sels[i]);for(var j=0;j<ns.length;j++)ns[j].remove();}' +
               'return (r.textContent||"").trim();})()'
             );
           })()
         `).then(function(text) {
-          if (text && text.length > 80 && text === lastReply) {
-            stableCount++;
-            if (stableCount >= 3 && miniChatWindow && !miniChatWindow.isDestroyed()) {
-              clearInterval(pollTimer);
-              // 在主进程做过滤，避免regex转义问题
-              var answer = text;
-              answer = answer.replace(/温馨提示[：:][\s\S]*$/g,'');
-              answer = answer.replace(/\n{3,}/g,'\n\n').trim();
-              miniChatWindow.webContents.send('mini:reply', answer);
-            }
-          } else if (text) {
-            lastReply = text;
-            stableCount = 0;
+          if (text && text.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
+            var answer = text.replace(/温馨提示[：:][\\s\\S]*$/g,'').replace(/\\n{3,}/g,'\\n\\n').trim();
+            miniChatWindow.webContents.send('mini:reply', answer);
+          } else {
+            miniChatWindow.webContents.send('mini:reply', '(未获取到回复)');
           }
-        }).catch(function(){});
+        }).catch(function(e) {
+          miniChatWindow.webContents.send('mini:reply', '(出错: ' + (e.message||'') + ')');
+        });
       } catch(_) {}
-    }, 2000);
-    setTimeout(function() { clearInterval(pollTimer); }, 30000);
+    }, 15000);
     if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '正在查询...');
   });
 
