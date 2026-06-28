@@ -504,25 +504,7 @@ function isRealtimeSearchPrompt(prompt) {
 
 async function injectPreferenceMemoryIntoRequestBody(bodyText) {
   if (typeof bodyText !== 'string' || !bodyText.trim()) return bodyText;
-  try {
-    const parsed = JSON.parse(bodyText);
-    if (!parsed || typeof parsed !== 'object' || typeof parsed.prompt !== 'string') {
-      return bodyText;
-    }
-    parsed.prompt = stripManagedPromptBlocks(parsed.prompt);
-    parsed.prompt = sanitizePromptByMode(parsed.prompt, { thinkingEnabled: parsed.thinking_enabled === true });
-    const extensionPrompt = buildPreferenceMemoryPromptFromExtensionMemories(
-      await getExtensionMemoriesFromRuntime(),
-      { thinkingEnabled: parsed.thinking_enabled === true }
-    );
-    const memoryPrompt = extensionPrompt || buildPreferenceMemoryPrompt();
-    if (memoryPrompt) {
-      parsed.prompt = memoryPrompt + '\n\n' + parsed.prompt;
-    }
-    return JSON.stringify(parsed);
-  } catch (_) {
-    return bodyText;
-  }
+  return bodyText;
 }
 
 function getFixedExtensionId() {
