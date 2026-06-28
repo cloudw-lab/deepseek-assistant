@@ -3613,7 +3613,7 @@ function createMiniChat() {
             );
           })()
         `).then(function(text) {
-          if (text && text.length > 5 && text === lastReply) {
+          if (text && text.length > 80 && text === lastReply) {
             stableCount++;
             if (stableCount >= 3 && miniChatWindow && !miniChatWindow.isDestroyed()) {
               clearInterval(pollTimer);
