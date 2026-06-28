@@ -3591,9 +3591,15 @@ function createMiniChat() {
         `);
       } catch(_) {}
     }
-    // 等15秒后取回复
-    setTimeout(function() {
-      if (!mainWindow || mainWindow.isDestroyed() || !miniChatWindow || miniChatWindow.isDestroyed()) return;
+    // 轮询回复，等到内容够长且稳定
+    var lastText = '';
+    var stable = 0;
+    var attempts = 0;
+    var timer = setInterval(function() {
+      attempts++;
+      if (!mainWindow || mainWindow.isDestroyed() || !miniChatWindow || miniChatWindow.isDestroyed()) {
+        clearInterval(timer); return;
+      }
       try {
         mainWindow.webContents.executeJavaScript(`
           (async function(){
@@ -3608,17 +3614,21 @@ function createMiniChat() {
             );
           })()
         `).then(function(text) {
-          if (text && text.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
-            var answer = text.replace(/温馨提示[：:][\\s\\S]*$/g,'').replace(/\\n{3,}/g,'\\n\\n').trim();
-            miniChatWindow.webContents.send('mini:reply', answer);
-          } else {
-            miniChatWindow.webContents.send('mini:reply', '(未获取到回复)');
+          if (text && text.length > 50 && text === lastText) {
+            stable++;
+          } else if (text && text.length > 50) {
+            lastText = text;
+            stable = 0;
           }
-        }).catch(function(e) {
-          miniChatWindow.webContents.send('mini:reply', '(出错: ' + (e.message||'') + ')');
-        });
+          // 稳定2次或超过40次尝试，返回结果
+          if ((stable >= 2 || attempts > 40) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
+            clearInterval(timer);
+            var answer = lastText.replace(/温馨提示[：:][\\s\\S]*$/g,'').replace(/\\n{3,}/g,'\\n\\n').trim();
+            miniChatWindow.webContents.send('mini:reply', answer);
+          }
+        }).catch(function(){});
       } catch(_) {}
-    }, 25000);
+    }, 2000);
     if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '正在查询...');
   });
 
