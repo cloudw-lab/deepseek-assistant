@@ -262,57 +262,39 @@ async function callDeepSeekApi(mainWindow, prompt) {
       '  var removeSelectors=[' +
       '    ".dpp-tool-block",'.replace(/'/g,'"') +
       '    ".dpp-artifact-results",'.replace(/'/g,'"') +
+      '    ".dpp-agent-container",'.replace(/'/g,'"') +
+      '    ".dpp-agent-step",'.replace(/'/g,'"') +
+      '    ".dpp-agent-footer",'.replace(/'/g,'"') +
+      '    ".dpp-agent-stop-btn",'.replace(/'/g,'"') +
       '    "[class*=tool]",'.replace(/'/g,'"') +
       '    "[class*=Tool]",'.replace(/'/g,'"') +
       '    "[class*=reason]",'.replace(/'/g,'"') +
       '    "[class*=Reason]",'.replace(/'/g,'"') +
       '    "[class*=think]",'.replace(/'/g,'"') +
-      '    "[class*=Think]"'.replace(/'/g,'"') +
+      '    "[class*=Think]",'.replace(/'/g,'"') +
+      '    "[class*=step]",'.replace(/'/g,'"') +
+      '    "[class*=Step]",'.replace(/'/g,'"') +
+      '    "[class*=agent]",'.replace(/'/g,'"') +
       '  ];' +
       '  for(var rs=0;rs<removeSelectors.length;rs++){' +
       '    var nodes=root.querySelectorAll(removeSelectors[rs]);' +
       '    for(var rn=0;rn<nodes.length;rn++)nodes[rn].remove();' +
       '  }' +
-      '  var blocks=root.querySelectorAll("div,section,article,details");' +
-      '  for(var bi=0;bi<blocks.length;bi++){' +
-      '    var bt=(blocks[bi].textContent||"").trim();' +
-      '    if(/^(已思考|思考中|正在思考|thinking|reasoning|thought)(?:[（(:：]|$)/i.test(bt)||/^(已执行工具|执行工具|工具调用|tool calls?)(?:\s|$)/i.test(bt)||/^step\s*\d+(?:\s|$)/i.test(bt)||/^agent\s*完成(?:\s|$)/i.test(bt)){' +
-      '      blocks[bi].remove();' +
-      '    }' +
-      '  }' +
-      '  var m=root.querySelectorAll(".ds-markdown");' +
-      '  if(m.length>0){' +
-      '    for(var i=m.length-1;i>=0;i--){var x=(m[i].textContent||"").trim();if(x){text=x;break;}}' +
-      '  }' +
-      '  if(!text){text=(root.textContent||"").trim();}' +
+      '  text=(root.textContent||"").trim();' +
       '}' +
       'if(text){' +
-      '  var finalMarkers=["最终答案","最终结论","答案","Final Answer","Answer"];' +
+      '  var finalMarkers=["最终答案","最终结论","Final Answer","Answer"];' +
       '  for(var fm=0;fm<finalMarkers.length;fm++){' +
       '    var marker=finalMarkers[fm];var idx=text.indexOf(marker);' +
       '    if(idx>=0){text=text.slice(idx+marker.length).replace(/^[:：\\s-]*/,"").trim();break;}' +
       '  }' +
-      '  text=text.replace(/^(已思考|思考中|正在思考|Thinking|Reasoning)[:：\\n\\s-]*/i,"");' +
-      '  text=text.replace(/^(思考过程|推理过程|analysis|reasoning)[:：][\\s\\S]*?\\n{2,}/i,"");' +
-      '  text=text.replace(/^已执行工具[\\s\\S]*?\\n{2,}/i,"");' +
-      '  text=text.replace(/^Step\\s*\\d+[\\s\\S]*?\\n{2,}/i,"");' +
-      '  text=text.replace(/^Agent\\s*完成[\\s\\S]*$/i,"");' +
-      '  var lines=text.split(/\\n/);' +
-      '  var keep=[];var skipping=false;' +
-      '  for(var j=0;j<lines.length;j++){' +
-      '    var line=lines[j];var trim=line.trim();' +
-      '    if(/^(已思考|思考中|正在思考|Thinking|Reasoning|Thoughts?|思考过程|推理过程|analysis|reasoning)$/i.test(trim)){skipping=true;continue;}' +
-      '    if(/^(思考[:：]|推理[:：]|analysis[:：]|reasoning[:：])/i.test(trim)){continue;}' +
-      '    if(/^(已执行工具|执行工具|工具调用|Tool Calls?)$/i.test(trim)){skipping=true;continue;}' +
-      '    if(/^Step\\s*\\d+(?:\\s|$)/i.test(trim)){skipping=true;continue;}' +
-      '    if(/^Agent\\s*完成(?:\\s|$)/i.test(trim)){continue;}' +
-      '    if(/^(搜索完成|找到\\s*\\d+\\s*条结果|Found\\s*\\d+\\s*results?)/i.test(trim)){continue;}' +
-      '    if(/^\\d+[\\.、]\\s+\\[?.*https?:\\/\\//i.test(trim)){continue;}' +
-      '    if(/^(web_search|web fetch|search results?|搜索结果)[:：]?/i.test(trim)){continue;}' +
-      '    if(skipping&&trim===""){skipping=false;continue;}' +
-      '    if(!skipping)keep.push(line);' +
-      '  }' +
-      '  text=keep.join("\\n").trim();' +
+      '  text=text.replace(/^(已思考|思考中|正在思考|Thinking|Reasoning)[:：\\n\\s-]*[\\s\\S]*?\\n\\n/i,"");' +
+      '  text=text.replace(/已执行工具[^\\n]*\\n[\\s\\S]*?\\n\\n/g,"");' +
+      '  text=text.replace(/Step\\s*\\d+[^\\n]*\\n[\\s\\S]*?\\n\\n/gi,"");' +
+      '  text=text.replace(/Agent\\s*完成[^\\n]*/gi,"");' +
+      '  text=text.replace(/以下是工具续跑[\\s\\S]*?<\\/tool_results>/gi,"");' +
+      '  text=text.replace(/<[^>]+>/g,"");' +
+      '  text=text.replace(/\\n{3,}/g,"\\n\\n").trim();' +
       '}' +
       'var l=!!document.querySelector("[class*=stop]");' +
       'return JSON.stringify({text:text,loading:l});})()'
@@ -364,9 +346,6 @@ async function handleMessages(messages) {
 
     console.log('[WeChat Bot] msg from', userId, ':', text.slice(0, 80));
 
-    // 强制直接回复，不使用工具、不展示中间步骤
-    var wechatPrompt = '[System: This is a WeChat conversation. Reply with ONLY the final result. Do NOT use tools (web_search, shell_exec, etc.). Do NOT show thinking, reasoning, steps, or intermediate results. Give a concise direct answer.]\n\n' + text;
-
     // 特殊命令
     if (text === '/reset') {
       conversationMap.delete(userId);
@@ -383,7 +362,7 @@ async function handleMessages(messages) {
         await sendMessage(userId, '聊天 webview 未就绪，请稍后', ctxToken); continue;
       }
 
-      const result = await callDeepSeekApi(mainWindowRef, wechatPrompt);
+      const result = await callDeepSeekApi(mainWindowRef, text);
 
       if (result.text) {
         await sendLongMessage(userId, result.text, ctxToken);
