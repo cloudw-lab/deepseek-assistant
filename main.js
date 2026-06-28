@@ -3378,10 +3378,10 @@ function createDesktopPet() {
     ? 'data:image/png;base64,' + fs.readFileSync(logoPath).toString('base64')
     : '';
 
-  const petSize = 100;
+  const petSize = 120;
   petWindow = new BrowserWindow({
-    width: petSize + 50,
-    height: petSize + 70,
+    width: petSize + 60,
+    height: petSize + 50,
     x: 100,
     y: 200,
     frame: false,
@@ -3397,23 +3397,27 @@ function createDesktopPet() {
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     * { margin:0; padding:0; }
     body { background:transparent; overflow:hidden; user-select:none; -webkit-app-region:no-drag; }
-    .pet { width:${petSize}px; height:${petSize}px; margin:45px 25px 0;
+    .pet { width:${petSize}px; height:${petSize}px; margin:30px 30px 0;
       background:url(${logoBase64}) no-repeat center/contain;
-      animation: swim 4s ease-in-out infinite; border-radius:50%; }
+      animation: swim 6s ease-in-out infinite; border-radius:50%; }
     .bubble { position:absolute; top:2px; left:50%; transform:translateX(-50%);
-      background:rgba(255,255,255,.92); border-radius:10px; padding:3px 8px;
-      font:11px sans-serif; color:#333; white-space:nowrap; display:none;
+      background:rgba(255,255,255,.92); border-radius:10px; padding:3px 10px;
+      font:bold 12px sans-serif; color:#333; white-space:nowrap; display:none;
       box-shadow:0 1px 6px rgba(0,0,0,.08); pointer-events:none; }
     .bubble.show { display:block; }
     @keyframes swim {
-      0%,100% { transform:translateY(0) rotate(-2deg); }
-      30% { transform:translateY(-6px) rotate(0deg); }
-      60% { transform:translateY(0) rotate(2deg); }
-      85% { transform:translateY(-3px) rotate(0deg); }
+      0%,100% { transform:translateX(0) translateY(0) scaleX(1); }
+      15% { transform:translateX(12px) translateY(-5px) scaleX(1); }
+      30% { transform:translateX(18px) translateY(0) scaleX(1); }
+      45% { transform:translateX(12px) translateY(-3px) scaleX(1); }
+      50% { transform:translateX(0) translateY(0) scaleX(1); }
+      65% { transform:translateX(-12px) translateY(-5px) scaleX(-1); }
+      80% { transform:translateX(-18px) translateY(0) scaleX(-1); }
+      95% { transform:translateX(-12px) translateY(-3px) scaleX(-1); }
     }
   </style></head><body>
     <div class="pet" id="pet"></div>
-    <div class="bubble" id="bubble">点我问天气</div>
+    <div class="bubble" id="bubble">点我提问</div>
     <script>
       const { ipcRenderer } = require('electron');
       var pet = document.getElementById('pet');
