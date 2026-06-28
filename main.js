@@ -3368,6 +3368,8 @@ app.whenReady().then(async () => {
 });
 
 let petWindow = null;
+let macroRecording = false;
+let macroActions = [];
 
 function createDesktopPet() {
   if (petWindow && !petWindow.isDestroyed()) return;
@@ -3525,8 +3527,6 @@ function createDesktopPet() {
 }
 
 // ============ 宏录制/回放 ============
-var macroRecording = false;
-var macroActions = [];
 
 function startMacroRecord() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
