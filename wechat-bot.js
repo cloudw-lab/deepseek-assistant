@@ -364,6 +364,9 @@ async function handleMessages(messages) {
 
     console.log('[WeChat Bot] msg from', userId, ':', text.slice(0, 80));
 
+    // 强制直接回复，不使用工具、不展示中间步骤
+    var wechatPrompt = '[System: This is a WeChat conversation. Reply with ONLY the final result. Do NOT use tools (web_search, shell_exec, etc.). Do NOT show thinking, reasoning, steps, or intermediate results. Give a concise direct answer.]\n\n' + text;
+
     // 特殊命令
     if (text === '/reset') {
       conversationMap.delete(userId);
@@ -380,7 +383,7 @@ async function handleMessages(messages) {
         await sendMessage(userId, '聊天 webview 未就绪，请稍后', ctxToken); continue;
       }
 
-      const result = await callDeepSeekApi(mainWindowRef, text);
+      const result = await callDeepSeekApi(mainWindowRef, wechatPrompt);
 
       if (result.text) {
         await sendLongMessage(userId, result.text, ctxToken);
