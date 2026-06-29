@@ -3626,41 +3626,46 @@ function createMiniChat() {
     .img-preview { display:flex; gap:4px; padding:4px 14px; flex-wrap:wrap; }
     .img-preview img { width:48px; height:48px; border-radius:6px; object-fit:cover; border:1px solid rgba(255,255,255,.1); }
   </style></head><body>
-    <div class="header">
-      <div class="header-btns">
-        <button class="mode active" data-mode="default" onclick="setMode('default',this)">默认</button>
-        <button class="mode" data-mode="expert" onclick="setMode('expert',this)">专家</button>
-        <button class="mode" data-mode="vision" onclick="setMode('vision',this)">识图</button>
-      </div>
-      <div class="header-btns">
-        <button onclick="newChat()" title="新对话">＋</button>
-        <button onclick="closeWin()" title="关闭">✕</button>
-      </div>
-    </div>
-    <div class="msgs" id="msgs"></div>
-    <div class="input-row">
-      <button class="img-btn" id="imgBtn" onclick="pickImage()" title="上传图片" style="display:none">🖼️</button>
-      <textarea id="q" placeholder="输入问题，Enter 发送...（识图模式可直接粘贴截图）" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ask()}"></textarea>
-      <button onclick="ask()">发送</button>
-    </div>
-    <div class="img-preview" id="imgPreview"></div>
-    <script>
-      const { ipcRenderer } = require('electron');
-      var currentMode = 'default';
-      var imagePaths = [];
-      function setMode(m, btn) {
-        try {
-          currentMode = m;
-          var all = document.querySelectorAll('.mode');
-          for (var i = 0; i < all.length; i++) { all[i].classList.remove('active'); }
-          btn.classList.add('active');
-          var imgBtn = document.getElementById('imgBtn');
-          if (imgBtn) imgBtn.style.display = m === 'vision' ? '' : 'none';
-        } catch(e) { console.error('setMode error:', e); }
-      }
-      function pickImage() {
-        ipcRenderer.send('mini:pickImage');
-      }
+     <div class="header">
+       <div class="header-btns">
+         <button class="mode active" data-mode="default" id="modeDefault">默认</button>
+         <button class="mode" data-mode="expert" id="modeExpert">专家</button>
+         <button class="mode" data-mode="vision" id="modeVision">识图</button>
+       </div>
+       <div class="header-btns">
+         <button id="btnNewChat" title="新对话">＋</button>
+         <button id="btnClose" title="关闭">✕</button>
+       </div>
+     </div>
+     <div class="msgs" id="msgs"></div>
+     <div class="input-row">
+       <button class="img-btn" id="imgBtn" title="上传图片" style="display:none">🖼️</button>
+       <textarea id="q" placeholder="输入问题..."></textarea>
+       <button id="btnSend">发送</button>
+     </div>
+     <div class="img-preview" id="imgPreview"></div>
+     <script>
+       const { ipcRenderer } = require('electron');
+       var currentMode = 'default';
+       var imagePaths = [];
+       function setMode(m, btn) {
+         try {
+           currentMode = m;
+           var all = document.querySelectorAll('.mode');
+           for (var i = 0; i < all.length; i++) { all[i].classList.remove('active'); }
+           btn.classList.add('active');
+           var imgBtn = document.getElementById('imgBtn');
+           if (imgBtn) imgBtn.style.display = m === 'vision' ? '' : 'none';
+         } catch(e) { console.error('setMode error:', e); }
+       }
+       document.getElementById('modeDefault').addEventListener('click', function(){ setMode('default', this); });
+       document.getElementById('modeExpert').addEventListener('click', function(){ setMode('expert', this); });
+       document.getElementById('modeVision').addEventListener('click', function(){ setMode('vision', this); });
+       document.getElementById('btnNewChat').addEventListener('click', function(){ ipcRenderer.send('mini:newchat'); document.getElementById('msgs').innerHTML = ''; });
+       document.getElementById('btnClose').addEventListener('click', function(){ ipcRenderer.send('mini:close'); });
+       document.getElementById('btnSend').addEventListener('click', ask);
+       document.getElementById('imgBtn').addEventListener('click', function(){ ipcRenderer.send('mini:pickImage'); });
+       document.getElementById('q').addEventListener('keydown', function(e){ if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); ask(); } });
       // 粘贴截图
       document.getElementById('q').addEventListener('paste', function(e) {
         if (currentMode !== 'vision') return;
