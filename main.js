@@ -3604,10 +3604,9 @@ function createMiniChat() {
     * { margin:0; padding:0; box-sizing:border-box; }
     body { background:rgba(24,24,27,.94); border-radius:16px; overflow:hidden;
       font:13px/1.6 -apple-system,sans-serif; color:#e4e4e7; display:flex; flex-direction:column; height:100vh; }
-    .header { padding:10px 14px; display:flex; justify-content:space-between; align-items:center;
-      border-bottom:1px solid rgba(255,255,255,.06); -webkit-app-region:drag; }
-    .header span { font-size:12px; color:#a1a1aa; }
-    .header-btns { display:flex; gap:4px; -webkit-app-region:no-drag; align-items:center; }
+     .header { padding:10px 14px; display:flex; justify-content:space-between; align-items:center;
+       border-bottom:1px solid rgba(255,255,255,.06); }
+     .header-btns { display:flex; gap:4px; align-items:center; }
     .header-btns button { background:rgba(255,255,255,.06); border:none; color:#a1a1aa; cursor:pointer; font-size:11px; padding:3px 8px; border-radius:6px; }
     .header-btns button.mode { padding:3px 8px; }
     .header-btns button.active { background:#4D6BFE; color:#fff; }
