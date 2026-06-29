@@ -3839,49 +3839,42 @@ function createMiniChat() {
         }
         console.log('[MiniChat] wcid=' + wcid + ' injecting question');
 
-        // Helper: inject code into webview
-        function injectWC(jsCode) {
-          wc.executeJavaScript(jsCode).catch(function(){});
-        }
-
-        // Paste images first
+        // Paste images via clipboard + sendInputEvent
         if (images.length > 0) {
           console.log('[MiniChat] pasting ' + images.length + ' images');
-          var fs = require('fs');
-          var pending = images.length;
-          images.forEach(function(imgPath) {
+          var nativeImage = require('electron').nativeImage;
+          var clipboard = require('electron').clipboard;
+          var prevImg = clipboard.readImage();
+          var prevText = clipboard.readText();
+          (function pasteNext(idx) {
+            if (idx >= images.length) {
+              // All pasted, proceed with question
+              setTimeout(function() { injectAndPoll(true); }, 500);
+              // Restore after a bit
+              setTimeout(function() {
+                clipboard.writeImage(prevImg);
+                clipboard.writeText(prevText);
+              }, 1000);
+              return;
+            }
             try {
-              var ext = require('path').extname(imgPath).toLowerCase();
-              var mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
-              var b64 = fs.readFileSync(imgPath).toString('base64');
-              var dataUrl = 'data:' + mime + ';base64,' + b64;
-              injectWC('(' + function(){
-                var DUMMY = 'PLACEHOLDER_DATAURL';
-                var FETCH_URL = DUMMY;
-                fetch(FETCH_URL).then(function(r){return r.blob()}).then(function(blob){
-                  var file = new File([blob], 'image.' + blob.type.split('/')[1] || 'png', {type: blob.type});
-                  var dt = new DataTransfer();
-                  dt.items.add(file);
-                  var ta = document.querySelector('textarea');
-                  if (ta) {
-                    ta.focus();
-                    var ev = new ClipboardEvent('paste', {bubbles: true, cancelable: true});
-                    Object.defineProperty(ev, 'clipboardData', {value: dt});
-                    ta.dispatchEvent(ev);
-                  }
-                });
-              }.toString().replace('PLACEHOLDER_DATAURL', JSON.stringify(dataUrl)) + ')()');
-            } catch(_) { pending--; }
-          });
-          // Question injection delayed to let images paste
-          setTimeout(function() {
-            doInjectQuestion(question, mode, !!images.length);
-          }, images.length * 800 + 500);
+              var img = nativeImage.createFromPath(images[idx]);
+              if (!img.isEmpty()) {
+                clipboard.writeImage(img);
+                // Focus webview and send Cmd+V
+                wc.focus();
+                wc.sendInputEvent({ type: 'keyDown', keyCode: 'v', modifiers: ['meta'] });
+                wc.sendInputEvent({ type: 'keyUp', keyCode: 'v', modifiers: ['meta'] });
+                console.log('[MiniChat] image ' + idx + ' pasted');
+              }
+            } catch(e) { console.log('[MiniChat] paste err:', e.message); }
+            setTimeout(function() { pasteNext(idx + 1); }, 600);
+          })(0);
         } else {
-          doInjectQuestion(question, mode, false);
+          injectAndPoll(false);
         }
 
-        function doInjectQuestion(question, mode, hasImages) {
+        function injectAndPoll(hasImages) {
           var code = '(' + (function(){
             var q='PLACEHOLDER_Q';
             var m='PLACEHOLDER_M';
