@@ -3854,33 +3854,42 @@ function createMiniChat() {
         }
 
         if (images.length > 0) {
-          var nativeImage = require('electron').nativeImage;
-          var clipboard = require('electron').clipboard;
-          var prevImg = clipboard.readImage();
-          var prevText = clipboard.readText();
+          miniChatWindow.webContents.send('mini:reply', '正在粘贴图片...');
+          var fs = require('fs');
           (function pasteNext(idx) {
-            if (idx >= images.length) {
-              clipboard.writeImage(prevImg);
-              clipboard.writeText(prevText);
-              injectQuestion();
-              return;
-            }
+            if (idx >= images.length) { injectQuestion(); return; }
             try {
-              var img = nativeImage.createFromPath(images[idx]);
-              if (!img.isEmpty()) {
-                clipboard.writeImage(img);
-                mainWindow.webContents.executeJavaScript(
-                  'document.getElementById("chatView")?document.getElementById("chatView").getWebContentsId():-1'
-                ).then(function(wcid) {
-                  if (wcid > 0) {
-                    var wc = require('electron').webContents.fromId(wcid);
-                    if (wc) { wc.focus(); wc.paste(); }
-                  }
-                  setTimeout(function() { pasteNext(idx + 1); }, 600);
-                }).catch(function() { pasteNext(idx + 1); });
-              } else {
-                pasteNext(idx + 1);
-              }
+              var ext = require('path').extname(images[idx]).toLowerCase();
+              var mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
+              var b64 = fs.readFileSync(images[idx]).toString('base64');
+              var dataUrl = 'data:' + mime + ';base64,' + b64;
+              mainWindow.webContents.executeJavaScript(`
+                (async function(){
+                  var chatView = document.getElementById('chatView');
+                  if (!chatView) return;
+                  await chatView.executeJavaScript(
+                    '(async function(){' +
+                    'var dataUrl = ${JSON.stringify(dataUrl)};' +
+                    'var resp = await fetch(dataUrl);' +
+                    'var blob = await resp.blob();' +
+                    'var file = new File([blob], "image.' + ext.replace('.','') + '", {type: blob.type});' +
+                    'var dt = new DataTransfer();' +
+                    'dt.items.add(file);' +
+                    'var ta = document.querySelector("textarea");' +
+                    'if (ta) {' +
+                    '  ta.focus();' +
+                    '  var ev = new ClipboardEvent("paste", {bubbles: true, cancelable: true});' +
+                    '  Object.defineProperty(ev, "clipboardData", {value: dt});' +
+                    '  ta.dispatchEvent(ev);' +
+                    '  return "ok";' +
+                    '}' +
+                    'return "no ta";' +
+                    '})()'
+                  );
+                })()
+              `).then(function() {
+                setTimeout(function() { pasteNext(idx + 1); }, 500);
+              }).catch(function() { pasteNext(idx + 1); });
             } catch(_) { pasteNext(idx + 1); }
           })(0);
         } else {
