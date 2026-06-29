@@ -3544,7 +3544,8 @@ function createDesktopPet() {
           petWindow.webContents.send('pet:status', 'idle');
           if (wasGenerating) {
             wasGenerating = false;
-            petWindow.webContents.send('pet:bubble', '任务已完成！');
+            var summary = (state.lastMsg || '').replace(/^[，,。.\s]+/,'').slice(0, 50);
+            petWindow.webContents.send('pet:bubble', summary ? '完成：' + summary : '任务已完成！');
           }
         }
 
