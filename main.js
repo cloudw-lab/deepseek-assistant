@@ -3787,10 +3787,10 @@ function createMiniChat() {
           (async function() {
             var chatView = document.getElementById('chatView');
             if (!chatView || typeof chatView.executeJavaScript !== 'function') return;
-            var q = ${JSON.stringify(question)};
-            var m = ${JSON.stringify(mode)};
             await chatView.executeJavaScript(
               '(function(){' +
+              'var q = ${JSON.stringify(question)};' +
+              'var m = ${JSON.stringify(mode)};' +
               'var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");' +
               'var modeMap={"default":"默认","DEFAULT":"默认","expert":"专家","EXPERT":"专家","vision":"识图","VISION":"识图"};' +
               'var target=modeMap[m]||"默认";' +
