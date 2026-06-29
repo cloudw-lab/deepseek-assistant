@@ -3507,72 +3507,35 @@ function createDesktopPet() {
 
   petWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 
-  // Phase 1: 智能感知 - 定期轮询状态
+  // Phase 2: 定时任务完成通知 - 检查侧边栏自动化状态
   console.log('[Pet] polling started');
+  var lastAutoCount = 0;
   var petPollTimer = setInterval(function() {
     if (!petWindow || petWindow.isDestroyed() || !mainWindow || mainWindow.isDestroyed()) {
       console.log('[Pet] poll stopped - window destroyed');
       clearInterval(petPollTimer);
       return;
     }
+    // 检查侧边栏自动化运行数量变化
     mainWindow.webContents.executeJavaScript(`
       (async function(){
-        var chatView = document.getElementById('chatView');
-        if (!chatView) return JSON.stringify({status:'no_chat'});
-        return await chatView.executeJavaScript(
+        var sp = document.getElementById('sidepanelView');
+        if (!sp || typeof sp.executeJavaScript !== 'function') return JSON.stringify({autos:0});
+        return await sp.executeJavaScript(
           '(function(){' +
-          // 检查是否在生成回复
-          'var stopBtn=document.querySelector("[class*=stop]");' +
-          'var thinking=!!document.querySelector("[class*=think],[class*=Think]");' +
-          // 获取最后一个对话文本
-          'var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
-          'var lastMsg="";' +
-          'if(roots.length>0){var r=roots[roots.length-1];lastMsg=(r.textContent||"").trim().slice(-100);}' +
-          'return JSON.stringify({status:stopBtn?"generating":"idle",thinking:thinking,lastMsg:lastMsg});' +
+          'var items=document.querySelectorAll("[class*=automationRun]");' +
+          'var succeeded=document.querySelectorAll("[class*=succeeded]");' +
+          'return JSON.stringify({autos:items.length,done:succeeded.length});' +
           '})()'
         );
       })()
     `).then(function(result) {
-      if (!result) return;
       try {
-        var state = JSON.parse(result);
-        var now = Date.now();
-
-        // 思考中 → 快游
-        if (state.status === 'generating') {
-          if (!wasGenerating) console.log('[Pet] detected generating...');
-          petWindow.webContents.send('pet:status', 'thinking');
-          lastActiveTime = now;
-          wasGenerating = true;
-        } else {
-          petWindow.webContents.send('pet:status', 'idle');
-          if (wasGenerating) {
-            wasGenerating = false;
-            var summary = (state.lastMsg || '').replace(/^[，,。.\s]+/,'').slice(0, 50);
-            var msg = summary ? '完成：' + summary : '任务已完成！';
-            console.log('[Pet] task complete, sending bubble:', msg);
-            petWindow.webContents.send('pet:bubble', msg);
-          }
+        var st = JSON.parse(result);
+        if (st.done > lastAutoCount) {
+          petWindow.webContents.send('pet:bubble', '定时任务已完成！');
         }
-
-        // 空闲超时 → 瞌睡
-        var idleSec = (now - lastActiveTime) / 1000;
-        if (idleSec > 300) {
-          petWindow.webContents.send('pet:status', 'sleepy');
-        }
-
-        // 时间段问候 (每30分钟一次)
-        if (now - lastGreetingTime > 1800000) {
-          var hour = new Date().getHours();
-          var greeting = '';
-          if (hour < 10) greeting = '早上好，今天有什么计划？';
-          else if (hour < 14) greeting = '中午好，需要帮你做什么？';
-          else if (hour < 18) greeting = '下午好，有什么需要？';
-          else if (hour < 22) greeting = '晚上好，需要总结今天吗？';
-          else greeting = '夜深了，还在工作吗？';
-          petWindow.webContents.send('pet:bubble', greeting);
-          lastGreetingTime = now;
-        }
+        lastAutoCount = st.done || 0;
       } catch(_) {}
     }).catch(function(){});
   }, 3000);
