@@ -3531,12 +3531,14 @@ function createDesktopPet() {
         );
       })()
     `).then(function(result) {
+      if (!result) return;
       try {
         var state = JSON.parse(result);
         var now = Date.now();
 
         // 思考中 → 快游
         if (state.status === 'generating') {
+          if (!wasGenerating) console.log('[Pet] detected generating...');
           petWindow.webContents.send('pet:status', 'thinking');
           lastActiveTime = now;
           wasGenerating = true;
@@ -3545,7 +3547,9 @@ function createDesktopPet() {
           if (wasGenerating) {
             wasGenerating = false;
             var summary = (state.lastMsg || '').replace(/^[，,。.\s]+/,'').slice(0, 50);
-            petWindow.webContents.send('pet:bubble', summary ? '完成：' + summary : '任务已完成！');
+            var msg = summary ? '完成：' + summary : '任务已完成！';
+            console.log('[Pet] task complete, sending bubble:', msg);
+            petWindow.webContents.send('pet:bubble', msg);
           }
         }
 
