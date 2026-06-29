@@ -3884,13 +3884,19 @@ function createMiniChat() {
           (async function(){
             var chatView=document.getElementById('chatView');
             if(!chatView)return"";
-            return await chatView.executeJavaScript(
-              '(function(){var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
-              'if(!roots.length)return"";var r=roots[roots.length-1].cloneNode(true);' +
-              'var nodes=r.querySelectorAll(".dpp-tool-block,.dpp-agent-container");' +
-              'for(var i=0;i<nodes.length;i++)nodes[i].remove();' +
-              'return (r.textContent||"").trim();})()'
-            );
+                return await chatView.executeJavaScript(
+                  '(function(){var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
+                  'if(!roots.length)return"";' +
+                  'var allText="";' +
+                  'for(var i=0;i<roots.length;i++){' +
+                  'var r=roots[i].cloneNode(true);' +
+                  'var nodes=r.querySelectorAll(".dpp-tool-block,.dpp-agent-container");' +
+                  'for(var j=0;j<nodes.length;j++)nodes[j].remove();' +
+                  'var t=(r.textContent||"").trim();' +
+                  'if(t.length>0&&t.indexOf("搜索")!==0&&t.indexOf("正在")!==0)allText+=t+"\\n";' +
+                  '}' +
+                  'return allText.trim();})()'
+                );
           })()
         `).then(function(text) {
           if (text && text.length > 50 && text === lastText) {
@@ -3899,8 +3905,12 @@ function createMiniChat() {
             lastText = text;
             stable = 0;
           }
-          // 稳定2次或超过40次尝试，返回结果
-          if ((stable >= 2 || attempts > 40) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
+          // 每10次尝试更新状态
+          if (attempts % 10 === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
+            miniChatWindow.webContents.send('mini:reply', '查询中...(' + attempts + ')');
+          }
+          // 稳定4次(8秒)或超过60次尝试(120秒)，返回结果
+          if ((stable >= 4 || attempts > 60) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
             clearInterval(timer);
             var answer = lastText.replace(/温馨提示[：:][\\s\\S]*$/g,'').replace(/\\n{3,}/g,'\\n\\n').trim();
             miniChatWindow.webContents.send('mini:reply', answer);
@@ -3908,7 +3918,7 @@ function createMiniChat() {
         }).catch(function(){});
       } catch(_) {}
     }, 2000);
-    if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '正在查询...');
+    if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '查询中...');
   });
 
   ipcMain.on('mini:close', function() {
