@@ -3507,37 +3507,21 @@ function createDesktopPet() {
 
   petWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 
-  // Phase 2: 定时任务完成通知 - 检查侧边栏自动化状态
+  // Phase 2: 检测自动化任务完成
   console.log('[Pet] polling started');
-  var lastAutoCount = 0;
+  var lastAutoDone = getAutomationState().runs.filter(function(r){return r&&r.status==='succeeded'}).length;
   var petPollTimer = setInterval(function() {
-    if (!petWindow || petWindow.isDestroyed() || !mainWindow || mainWindow.isDestroyed()) {
+    if (!petWindow || petWindow.isDestroyed()) {
       console.log('[Pet] poll stopped - window destroyed');
       clearInterval(petPollTimer);
       return;
     }
-    // 检查侧边栏自动化运行数量变化
-    mainWindow.webContents.executeJavaScript(`
-      (async function(){
-        var sp = document.getElementById('sidepanelView');
-        if (!sp || typeof sp.executeJavaScript !== 'function') return JSON.stringify({autos:0});
-        return await sp.executeJavaScript(
-          '(function(){' +
-          'var items=document.querySelectorAll("[class*=automationRun]");' +
-          'var succeeded=document.querySelectorAll("[class*=succeeded]");' +
-          'return JSON.stringify({autos:items.length,done:succeeded.length});' +
-          '})()'
-        );
-      })()
-    `).then(function(result) {
-      try {
-        var st = JSON.parse(result);
-        if (st.done > lastAutoCount) {
-          petWindow.webContents.send('pet:bubble', '定时任务已完成！');
-        }
-        lastAutoCount = st.done || 0;
-      } catch(_) {}
-    }).catch(function(){});
+    var runs = getAutomationState().runs;
+    var done = runs.filter(function(r){return r&&r.status==='succeeded'}).length;
+    if (done > lastAutoDone) {
+      petWindow.webContents.send('pet:bubble', '定时任务已完成！');
+    }
+    lastAutoDone = done;
   }, 3000);
 
   ipcMain.removeAllListeners('pet:move');
