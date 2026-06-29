@@ -3865,9 +3865,6 @@ function createMiniChat() {
           });
         }
 
-        if (images.length > 0) {
-          miniChatWindow.webContents.send('mini:reply', '图片请手动粘贴到主窗口');
-        }
         injectQuestion();
       } catch(_) {}
     }
