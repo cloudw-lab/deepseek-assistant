@@ -3517,11 +3517,14 @@ function createDesktopPet() {
       return;
     }
     var runs = getAutomationState().runs;
+    var statuses = runs.map(function(r){return r?.status}).join(',');
     var done = runs.filter(function(r){return r&&r.status==='succeeded'}).length;
     if (done > lastAutoDone) {
+      console.log('[Pet] automation done detected! count=', done, 'last=', lastAutoDone);
       petWindow.webContents.send('pet:bubble', '定时任务已完成！');
     }
     lastAutoDone = done;
+    if (statuses) console.log('[Pet] auto runs statuses:', statuses);
   }, 3000);
 
   ipcMain.removeAllListeners('pet:move');
