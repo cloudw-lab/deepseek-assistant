@@ -3640,8 +3640,8 @@ function createMiniChat() {
     </div>
     <div class="msgs" id="msgs"></div>
     <div class="input-row">
-      <button class="img-btn" onclick="pickImage()" title="上传图片">🖼️</button>
-      <textarea id="q" placeholder="输入问题，Enter 发送..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ask()}"></textarea>
+      <button class="img-btn" id="imgBtn" onclick="pickImage()" title="上传图片" style="display:none">🖼️</button>
+      <textarea id="q" placeholder="输入问题，Enter 发送...（识图模式可直接粘贴截图）" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ask()}"></textarea>
       <button onclick="ask()">发送</button>
     </div>
     <div class="img-preview" id="imgPreview"></div>
@@ -3653,10 +3653,30 @@ function createMiniChat() {
         currentMode = m;
         document.querySelectorAll('.mode').forEach(function(b){ b.classList.remove('active'); });
         btn.classList.add('active');
+        // 只识图模式显示上传按钮
+        document.getElementById('imgBtn').style.display = m==='vision' ? '' : 'none';
       }
       function pickImage() {
         ipcRenderer.send('mini:pickImage');
       }
+      // 粘贴截图
+      document.getElementById('q').addEventListener('paste', function(e) {
+        if (currentMode !== 'vision') return;
+        var items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') === 0) {
+            e.preventDefault();
+            var blob = items[i].getAsFile();
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+              ipcRenderer.send('mini:pasteImage', ev.target.result);
+            };
+            reader.readAsDataURL(blob);
+            break;
+          }
+        }
+      });
       ipcRenderer.on('mini:imagePicked', function(_, path) {
         if (!path) return;
         imagePaths.push(path);
@@ -3692,6 +3712,7 @@ function createMiniChat() {
   ipcMain.removeAllListeners('mini:close');
   ipcMain.removeAllListeners('mini:newchat');
   ipcMain.removeAllListeners('mini:pickImage');
+  ipcMain.removeAllListeners('mini:pasteImage');
 
   ipcMain.on('mini:pickImage', function() {
     const { dialog } = require('electron');
@@ -3703,6 +3724,13 @@ function createMiniChat() {
         miniChatWindow.webContents.send('mini:imagePicked', result.filePaths[0]);
       }
     });
+  });
+
+  ipcMain.on('mini:pasteImage', function(_, dataUrl) {
+    var buf = Buffer.from(dataUrl.split(',')[1], 'base64');
+    var tmpPath = require('path').join(require('os').tmpdir(), 'deepseek-paste-' + Date.now() + '.png');
+    require('fs').writeFileSync(tmpPath, buf);
+    if (miniChatWindow) miniChatWindow.webContents.send('mini:imagePicked', tmpPath);
   });
 
   ipcMain.on('mini:newchat', function() {
