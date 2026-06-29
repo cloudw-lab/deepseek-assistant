@@ -3364,7 +3364,10 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 
-  setTimeout(function() { createDesktopPet(); }, 3000);
+  setTimeout(function() {
+    console.log('[Pet] creating desktop pet...');
+    createDesktopPet();
+  }, 3000);
 });
 
 let petWindow = null;
@@ -3506,30 +3509,30 @@ function createDesktopPet() {
     </script></body></html>`;
 
   petWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  console.log('[Pet] window created, setting up polling...');
 
-  // Phase 2: 检测自动化任务完成
+  // 检测聊天框新回复 → 通知
   console.log('[Pet] polling started');
-  var knownAutoIds = {};
-  var initRuns = getAutomationState().runs;
-  for (var i=0;i<initRuns.length;i++) {
-    if (initRuns[i]&&initRuns[i].id) knownAutoIds[initRuns[i].id] = true;
-  }
+  var lastMsgCount = 0;
   var petPollTimer = setInterval(function() {
-    if (!petWindow || petWindow.isDestroyed()) {
+    if (!petWindow || petWindow.isDestroyed() || !mainWindow || mainWindow.isDestroyed()) {
       clearInterval(petPollTimer);
       return;
     }
-    var runs = getAutomationState().runs;
-    for (var j=0;j<runs.length;j++) {
-      var r = runs[j];
-      if (r && r.status==='succeeded' && r.id && !knownAutoIds[r.id]) {
-        knownAutoIds[r.id] = true;
-        var name = (r.automationName||'').slice(0,20) || '定时任务';
-        petWindow.webContents.send('pet:bubble', name+'已完成！');
-        console.log('[Pet] new automation done:', r.id, name);
-        break;
+    mainWindow.webContents.executeJavaScript(`
+      (async function(){
+        var chatView = document.getElementById('chatView');
+        if (!chatView) return 0;
+        return await chatView.executeJavaScript(
+          'document.querySelectorAll("._74c0879, .ds-assistant-message-main-content").length'
+        );
+      })()
+    `).then(function(count) {
+      if (count > lastMsgCount && lastMsgCount > 0) {
+        petWindow.webContents.send('pet:bubble', '任务已完成！');
       }
-    }
+      lastMsgCount = count || 0;
+    }).catch(function(){});
   }, 3000);
 
   ipcMain.removeAllListeners('pet:move');
