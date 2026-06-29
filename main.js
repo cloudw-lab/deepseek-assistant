@@ -3839,30 +3839,81 @@ function createMiniChat() {
         }
         console.log('[MiniChat] wcid=' + wcid + ' injecting question');
 
-        // Inject question into webview
-        var code = '(' + (function(){
-          var q='PLACEHOLDER_Q';
-          var m='PLACEHOLDER_M';
-          var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");
-          var modeMap={"default":"\u9ed8\u8ba4","DEFAULT":"\u9ed8\u8ba4","expert":"\u4e13\u5bb6","EXPERT":"\u4e13\u5bb6","vision":"\u8bc6\u56fe","VISION":"\u8bc6\u56fe"};
-          var target=modeMap[m]||"\u9ed8\u8ba4";
-          for(var i=0;i<modeBtns.length;i++){if((modeBtns[i].textContent||"").trim().indexOf(target)>=0){modeBtns[i].click();break;}}
-          setTimeout(function(){
-            var ta=document.querySelector("textarea");if(!ta)return;
-            var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;
-            ns.call(ta,"");ns.call(ta,q);ta.focus();
-            ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:q}));
-            ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:q}));
-            ta.dispatchEvent(new Event("change",{bubbles:true}));
-            var btns=document.querySelectorAll("button");var sBtn=null;
-            for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("\u53d1\u9001")>=0||txt==="send"||txt==="\u53d1\u9001"){sBtn=b;break;}}
-            if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}
-            if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}
-            ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
-          },300);
-        }).toString() + ')()';
-        code = code.replace('PLACEHOLDER_Q', JSON.stringify(question)).replace('PLACEHOLDER_M', JSON.stringify(mode));
-        wc.executeJavaScript(code);
+        // Helper: inject code into webview
+        function injectWC(jsCode) {
+          wc.executeJavaScript(jsCode).catch(function(){});
+        }
+
+        // Paste images first
+        if (images.length > 0) {
+          console.log('[MiniChat] pasting ' + images.length + ' images');
+          var fs = require('fs');
+          var pending = images.length;
+          images.forEach(function(imgPath) {
+            try {
+              var ext = require('path').extname(imgPath).toLowerCase();
+              var mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
+              var b64 = fs.readFileSync(imgPath).toString('base64');
+              var dataUrl = 'data:' + mime + ';base64,' + b64;
+              injectWC('(' + function(){
+                var DUMMY = 'PLACEHOLDER_DATAURL';
+                var FETCH_URL = DUMMY;
+                fetch(FETCH_URL).then(function(r){return r.blob()}).then(function(blob){
+                  var file = new File([blob], 'image.' + blob.type.split('/')[1] || 'png', {type: blob.type});
+                  var dt = new DataTransfer();
+                  dt.items.add(file);
+                  var ta = document.querySelector('textarea');
+                  if (ta) {
+                    ta.focus();
+                    var ev = new ClipboardEvent('paste', {bubbles: true, cancelable: true});
+                    Object.defineProperty(ev, 'clipboardData', {value: dt});
+                    ta.dispatchEvent(ev);
+                  }
+                });
+              }.toString().replace('PLACEHOLDER_DATAURL', JSON.stringify(dataUrl)) + ')()');
+            } catch(_) { pending--; }
+          });
+          // Question injection delayed to let images paste
+          setTimeout(function() {
+            doInjectQuestion(question, mode, !!images.length);
+          }, images.length * 800 + 500);
+        } else {
+          doInjectQuestion(question, mode, false);
+        }
+
+        function doInjectQuestion(question, mode, hasImages) {
+          var code = '(' + (function(){
+            var q='PLACEHOLDER_Q';
+            var m='PLACEHOLDER_M';
+            var HAS_IMAGES = false;
+            var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");
+            var modeMap={"default":"\u9ed8\u8ba4","DEFAULT":"\u9ed8\u8ba4","expert":"\u4e13\u5bb6","EXPERT":"\u4e13\u5bb6","vision":"\u8bc6\u56fe","VISION":"\u8bc6\u56fe"};
+            var target=modeMap[m]||"\u9ed8\u8ba4";
+            for(var i=0;i<modeBtns.length;i++){if((modeBtns[i].textContent||"").trim().indexOf(target)>=0){modeBtns[i].click();break;}}
+            if (!q && !HAS_IMAGES) return;
+            setTimeout(function(){
+              var ta=document.querySelector("textarea");if(!ta)return;
+              var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;
+              if (q) {
+                ns.call(ta,"");ns.call(ta,q);ta.focus();
+                ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:q}));
+                ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:q}));
+                ta.dispatchEvent(new Event("change",{bubbles:true}));
+              } else {
+                ta.focus();
+              }
+              var btns=document.querySelectorAll("button");var sBtn=null;
+              for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("\u53d1\u9001")>=0||txt==="send"||txt==="\u53d1\u9001"){sBtn=b;break;}}
+              if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}
+              if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}
+              if (q) ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
+            },300);
+          }).toString() + ')()';
+          code = code.replace('PLACEHOLDER_Q', JSON.stringify(question || ''))
+            .replace('PLACEHOLDER_M', JSON.stringify(mode))
+            .replace('HAS_IMAGES = false', 'HAS_IMAGES = ' + (hasImages ? 'true' : 'false'));
+          wc.executeJavaScript(code);
+        }
 
         // Start polling via the same webContents
         if (miniChatPollTimer) { clearInterval(miniChatPollTimer); miniChatPollTimer = null; }
