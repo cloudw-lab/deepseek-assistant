@@ -3368,8 +3368,6 @@ app.whenReady().then(async () => {
 });
 
 let petWindow = null;
-let macroRecording = false;
-let macroActions = [];
 
 function createDesktopPet() {
   if (petWindow && !petWindow.isDestroyed()) return;
@@ -3402,14 +3400,13 @@ function createDesktopPet() {
     .pet { width:${petSize}px; height:${petSize}px; margin:20px 40px 0;
       background:url(${logoB64}) no-repeat center/contain;
       animation: swim 8s ease-in-out infinite; }
+    .pet[data-status="thinking"] { animation: swim 1.5s ease-in-out infinite; filter: brightness(1.1) drop-shadow(0 0 6px #4D6BFE); }
     .bubble { position:absolute; top:2px; left:50%; transform:translateX(-50%);
       background:rgba(255,255,255,.92); border-radius:10px; padding:3px 10px;
       font:bold 12px sans-serif; color:#333; white-space:nowrap; display:none;
       box-shadow:0 1px 6px rgba(0,0,0,.08); pointer-events:none; }
-    .bubble.show { display:block; }
-    .pet[data-state="recording"] { animation: swim 1s ease-in-out infinite; filter: drop-shadow(0 0 8px red); }
-    .pet[data-state="playing"] { animation: swim 0.6s ease-in-out infinite; filter: drop-shadow(0 0 8px #22c55e); }
-    .close-btn { position:absolute; top:18px; right:22px; width:18px; height:18px;
+     .bubble.show { display:block; }
+     .close-btn { position:absolute; top:18px; right:22px; width:18px; height:18px;
       background:rgba(0,0,0,.4); border-radius:50%; color:#fff; font-size:11px;
       line-height:18px; text-align:center; cursor:pointer; opacity:0; transition:opacity .2s; }
     body:hover .close-btn { opacity:1; }
@@ -3435,6 +3432,12 @@ function createDesktopPet() {
       var bubble = document.getElementById('bubble');
       var startX, startY, startTime;
       var dragged = false;
+      var currentStatus = 'idle';
+
+      ipcRenderer.on('pet:status', function(_, s) {
+        currentStatus = s;
+        pet.setAttribute('data-status', s);
+      });
 
       document.getElementById('closeBtn').addEventListener('click', function(e) {
         e.stopPropagation();
@@ -3474,19 +3477,6 @@ function createDesktopPet() {
         ipcRenderer.send('pet:dblclick');
       });
 
-      pet.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-        ipcRenderer.send('pet:contextmenu');
-      });
-
-      // 状态响应
-      ipcRenderer.on('pet:state', function(_, state) {
-        pet.setAttribute('data-state', state);
-        if (state === 'recording') { bubble.textContent = '录制中...'; bubble.classList.add('show'); }
-        else if (state === 'playing') { bubble.textContent = '执行中...'; bubble.classList.add('show'); }
-        else { bubble.classList.remove('show'); }
-      });
-
       // 气泡轮播
       var msgs = ['点我提问','有什么可以帮你?','Hi ~','今天有什么任务?'];
       var mi = 0;
@@ -3502,10 +3492,44 @@ function createDesktopPet() {
 
   petWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 
+  // Phase 1: 智能感知 - 定期轮询状态
+  var petPollTimer = setInterval(function() {
+    if (!petWindow || petWindow.isDestroyed() || !mainWindow || mainWindow.isDestroyed()) {
+      clearInterval(petPollTimer);
+      return;
+    }
+    mainWindow.webContents.executeJavaScript(`
+      (async function(){
+        var chatView = document.getElementById('chatView');
+        if (!chatView) return JSON.stringify({status:'no_chat'});
+        return await chatView.executeJavaScript(
+          '(function(){' +
+          // 检查是否在生成回复
+          'var stopBtn=document.querySelector("[class*=stop]");' +
+          'var thinking=!!document.querySelector("[class*=think],[class*=Think]");' +
+          // 获取最后一个对话文本
+          'var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
+          'var lastMsg="";' +
+          'if(roots.length>0){var r=roots[roots.length-1];lastMsg=(r.textContent||"").trim().slice(-100);}' +
+          'return JSON.stringify({status:stopBtn?"generating":"idle",thinking:thinking,lastMsg:lastMsg});' +
+          '})()'
+        );
+      })()
+    `).then(function(result) {
+      try {
+        var state = JSON.parse(result);
+        if (state.status === 'generating') {
+          petWindow.webContents.send('pet:status', 'thinking');
+        } else {
+          petWindow.webContents.send('pet:status', 'idle');
+        }
+      } catch(_) {}
+    }).catch(function(){});
+  }, 3000);
+
   ipcMain.removeAllListeners('pet:move');
   ipcMain.removeAllListeners('pet:click');
   ipcMain.removeAllListeners('pet:dblclick');
-  ipcMain.removeAllListeners('pet:contextmenu');
   ipcMain.removeAllListeners('pet:close');
 
   ipcMain.on('pet:move', function(_, dx, dy) {
@@ -3526,16 +3550,6 @@ function createDesktopPet() {
     }
   });
 
-  ipcMain.on('pet:contextmenu', function() {
-    if (macroRecording) {
-      stopMacroRecord();
-    } else if (macroActions.length > 0) {
-      playMacro();
-    } else {
-      startMacroRecord();
-    }
-  });
-
   ipcMain.on('pet:close', function() {
     if (petWindow && !petWindow.isDestroyed()) {
       petWindow.close();
@@ -3546,95 +3560,6 @@ function createDesktopPet() {
       miniChatWindow = null;
     }
   });
-}
-
-// ============ 宏录制/回放 ============
-
-function startMacroRecord() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  macroActions = [];
-  macroRecording = true;
-  if (petWindow) petWindow.webContents.send('pet:state', 'recording');
-  mainWindow.webContents.executeJavaScript(`
-    (async function(){
-      var chatView = document.getElementById('chatView');
-      if (!chatView) return;
-      await chatView.executeJavaScript('window.__dpp_record_start = true;');
-    })()
-  `).catch(function(){});
-  // 注入录制监听
-  mainWindow.webContents.executeJavaScript(`
-    (async function(){
-      var chatView = document.getElementById('chatView');
-      if (!chatView) return;
-      await chatView.executeJavaScript(
-        '(function(){' +
-        'if(window.__dpp_recorder_active)return;' +
-        'window.__dpp_recorder_active=true;' +
-        'window.__dpp_actions=[];' +
-        'document.addEventListener("click",function(e){' +
-        '  if(!window.__dpp_record_start)return;' +
-        '  var t=e.target;' +
-        '  window.__dpp_actions.push({type:"click",tag:t.tagName,text:(t.textContent||"").trim().slice(0,50),x:e.clientX,y:e.clientY,t:Date.now(),selector:t.id?("#"+t.id):(t.className?("."+t.className.split(" ")[0]):"")});' +
-        '},true);' +
-        'document.addEventListener("keydown",function(e){' +
-        '  if(!window.__dpp_record_start)return;' +
-        '  if(e.target.tagName==="TEXTAREA"||e.target.tagName==="INPUT"){' +
-        '    window.__dpp_actions.push({type:"key",key:e.key,value:e.target.value,t:Date.now()});' +
-        '  }' +
-        '},true);' +
-        '})()'
-      );
-    })()
-  `).catch(function(){});
-}
-
-function stopMacroRecord() {
-  macroRecording = false;
-  if (petWindow) petWindow.webContents.send('pet:state', 'idle');
-  mainWindow.webContents.executeJavaScript(`
-    (async function(){
-      var chatView = document.getElementById('chatView');
-      if (!chatView) return '[]';
-      var result = await chatView.executeJavaScript('window.__dpp_actions;window.__dpp_record_start=false;window.__dpp_recorder_active=false;JSON.stringify(window.__dpp_actions||[])');
-      return result;
-    })()
-  `).then(function(actions) {
-    try {
-      if (actions) macroActions = JSON.parse(actions);
-      console.log('[Macro] recorded', macroActions.length, 'actions');
-    } catch(_) {}
-  });
-}
-
-function playMacro() {
-  if (macroActions.length === 0 || !mainWindow || mainWindow.isDestroyed()) return;
-  if (petWindow) petWindow.webContents.send('pet:state', 'playing');
-  mainWindow.webContents.executeJavaScript(`
-    (async function(){
-      var chatView = document.getElementById('chatView');
-      if (!chatView) return;
-      await chatView.executeJavaScript(
-        '(async function(){' +
-        'var actions=' + JSON.stringify(macroActions) + ';' +
-        'for(var i=0;i<actions.length;i++){' +
-        '  var a=actions[i];' +
-        '  await new Promise(function(r){setTimeout(r, a.t?(a.t-Math.min.apply(null,actions.map(function(x){return x.t}))+500):200);});' +
-        '  if(a.type==="click"){' +
-        '    var el=document.querySelector(a.selector)||document.elementFromPoint(a.x,a.y);' +
-        '    if(el){el.click();el.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));el.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));}' +
-        '  }else if(a.type==="key"){' +
-        '    var ta=document.querySelector("textarea");' +
-        '    if(ta){var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;ns.call(ta,a.value);' +
-        '    ta.dispatchEvent(new InputEvent("input",{bubbles:true}));}' +
-        '  }' +
-        '}' +
-        '})()'
-      );
-    })()
-  `).then(function() {
-    if (petWindow) petWindow.webContents.send('pet:state', 'idle');
-  }).catch(function(){});
 }
 
 let miniChatWindow = null;
