@@ -3508,8 +3508,10 @@ function createDesktopPet() {
   petWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 
   // Phase 1: 智能感知 - 定期轮询状态
+  console.log('[Pet] polling started');
   var petPollTimer = setInterval(function() {
     if (!petWindow || petWindow.isDestroyed() || !mainWindow || mainWindow.isDestroyed()) {
+      console.log('[Pet] poll stopped - window destroyed');
       clearInterval(petPollTimer);
       return;
     }
