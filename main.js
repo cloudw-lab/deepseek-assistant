@@ -3681,17 +3681,16 @@ function createMiniChat() {
         if (!path) return;
         imagePaths.push(path);
         var preview = document.getElementById('imgPreview');
-        preview.innerHTML += '<img src="file://'+path+'" onclick="this.remove();imagePaths=imagePaths.filter(function(p){return p!=='+JSON.stringify(path)+'})" title="点击移除">';
+        preview.innerHTML += '<div style="display:flex;align-items:center;gap:4px"><img src="file://'+path.replace(/\\/g,'/')+'" onclick="this.parentElement.remove();imagePaths=imagePaths.filter(function(p){return p!=='+JSON.stringify(path)+'})" title="点击移除" style="width:48px;height:48px;border-radius:6px;object-fit:cover;cursor:pointer"><span style="font-size:10px;color:#a1a1aa">切换到主窗口粘贴此图片</span></div>';
       });
       function ask() {
         var q = document.getElementById('q').value.trim();
-        if (!q && imagePaths.length === 0) return;
-        if (!q && imagePaths.length > 0) q = '分析这张图片';
+        if (!q) return;
         document.getElementById('msgs').innerHTML += '<div class="msg user">'+q.replace(/</g,'&lt;')+'</div>';
         document.getElementById('msgs').innerHTML += '<div class="msg ai loading" id="loading">思考中...</div>';
         document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
         document.getElementById('q').value = '';
-        ipcRenderer.send('mini:ask', { q: q, mode: currentMode, images: imagePaths.slice() });
+        ipcRenderer.send('mini:ask', { q: q, mode: currentMode });
         imagePaths = [];
         document.getElementById('imgPreview').innerHTML = '';
       }
