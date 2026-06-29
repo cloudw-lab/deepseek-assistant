@@ -3453,7 +3453,7 @@ function createDesktopPet() {
       ipcRenderer.on('pet:bubble', function(_, msg) {
         bubble.textContent = msg;
         bubble.classList.add('show');
-        setTimeout(function(){ bubble.classList.remove('show'); }, 5000);
+        setTimeout(function(){ bubble.classList.remove('show'); }, 8000);
       });
 
       document.getElementById('closeBtn').addEventListener('click', function(e) {
