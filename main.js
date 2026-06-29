@@ -3595,8 +3595,9 @@ function createMiniChat() {
     transparent: true,
     alwaysOnTop: true,
     hasShadow: false,
-    resizable: true,
+    resizable: false,
     skipTaskbar: true,
+    show: false,
     webPreferences: { nodeIntegration: true, contextIsolation: false, sandbox: false },
   });
   miniChatWindow.setVisibleOnAllWorkspaces(true);
@@ -3646,8 +3647,19 @@ function createMiniChat() {
      </div>
      <div class="img-preview" id="imgPreview"></div>
       <script>
-        window.onerror = function(msg, url, line) { document.body.innerText = 'ERR:'+msg+' at '+line; };
-        const { ipcRenderer } = require('electron');
+        console.log('[MiniChat] script starting...');
+        window.onerror = function(msg, url, line) { 
+          console.error('[MiniChat] ERROR:', msg, 'at', line);
+          document.body.innerText = 'ERR:'+msg+' at '+line; 
+        };
+        try {
+          const { ipcRenderer } = require('electron');
+          console.log('[MiniChat] ipcRenderer:', typeof ipcRenderer);
+        } catch(e) {
+          console.error('[MiniChat] require failed:', e.message);
+          document.body.innerText = 'REQUIRE ERR: '+e.message;
+          throw e;
+        }
         var currentMode = 'default';
         var imagePaths = [];
        function setMode(m, btn) {
@@ -3711,11 +3723,17 @@ function createMiniChat() {
         document.getElementById('msgs').innerHTML += '<div class="msg ai">'+text.replace(/</g,'&lt;')+'</div>';
         document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
       });
+      console.log('[MiniChat] all event listeners attached, ready for clicks');
+      document.addEventListener('mousedown', function(e) {
+        console.log('[MiniChat] mousedown on', e.target.tagName, '#', e.target.id);
+      }, true);
     </script></body></html>`;
 
   miniChatWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
-  miniChatWindow.show();
-  miniChatWindow.focus();
+  miniChatWindow.webContents.on('did-finish-load', function() {
+    miniChatWindow.show();
+    miniChatWindow.focus();
+  });
   miniChatWindow.webContents.openDevTools({ mode: 'detach' });
   miniChatWindow.on('closed', function() { miniChatWindow = null; });
 
