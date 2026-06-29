@@ -3594,6 +3594,7 @@ function createMiniChat() {
     frame: false,
     transparent: true,
     alwaysOnTop: true,
+    hasShadow: false,
     resizable: true,
     skipTaskbar: true,
     webPreferences: { nodeIntegration: true, contextIsolation: false, sandbox: false },
@@ -3644,10 +3645,11 @@ function createMiniChat() {
        <button id="btnSend">发送</button>
      </div>
      <div class="img-preview" id="imgPreview"></div>
-     <script>
-       const { ipcRenderer } = require('electron');
-       var currentMode = 'default';
-       var imagePaths = [];
+      <script>
+        window.onerror = function(msg, url, line) { document.body.innerText = 'ERR:'+msg+' at '+line; };
+        const { ipcRenderer } = require('electron');
+        var currentMode = 'default';
+        var imagePaths = [];
        function setMode(m, btn) {
          try {
            currentMode = m;
@@ -3711,12 +3713,10 @@ function createMiniChat() {
       });
     </script></body></html>`;
 
-  // Write HTML to temp file and load via file:// (more reliable than data: URL)
-  var fs = require('fs');
-  var path = require('path');
-  var tmpHtml = path.join(require('os').tmpdir(), 'deepseek-mini-chat.html');
-  fs.writeFileSync(tmpHtml, html);
-  miniChatWindow.loadURL('file://' + tmpHtml);
+  miniChatWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  miniChatWindow.show();
+  miniChatWindow.focus();
+  miniChatWindow.webContents.openDevTools({ mode: 'detach' });
   miniChatWindow.on('closed', function() { miniChatWindow = null; });
 
   ipcMain.removeAllListeners('mini:ask');
