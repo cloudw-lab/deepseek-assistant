@@ -3854,47 +3854,9 @@ function createMiniChat() {
         }
 
         if (images.length > 0) {
-          miniChatWindow.webContents.send('mini:reply', '正在粘贴图片...');
-          var fs = require('fs');
-          (function pasteNext(idx) {
-            if (idx >= images.length) { injectQuestion(); return; }
-            try {
-              var ext = require('path').extname(images[idx]).toLowerCase();
-              var mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
-              var b64 = fs.readFileSync(images[idx]).toString('base64');
-              var dataUrl = 'data:' + mime + ';base64,' + b64;
-              mainWindow.webContents.executeJavaScript(`
-                (async function(){
-                  var chatView = document.getElementById('chatView');
-                  if (!chatView) return;
-                  await chatView.executeJavaScript(
-                    '(async function(){' +
-                    'var dataUrl = ${JSON.stringify(dataUrl)};' +
-                    'var resp = await fetch(dataUrl);' +
-                    'var blob = await resp.blob();' +
-                    'var file = new File([blob], "image.' + ext.replace('.','') + '", {type: blob.type});' +
-                    'var dt = new DataTransfer();' +
-                    'dt.items.add(file);' +
-                    'var ta = document.querySelector("textarea");' +
-                    'if (ta) {' +
-                    '  ta.focus();' +
-                    '  var ev = new ClipboardEvent("paste", {bubbles: true, cancelable: true});' +
-                    '  Object.defineProperty(ev, "clipboardData", {value: dt});' +
-                    '  ta.dispatchEvent(ev);' +
-                    '  return "ok";' +
-                    '}' +
-                    'return "no ta";' +
-                    '})()'
-                  );
-                })()
-              `).then(function() {
-                setTimeout(function() { pasteNext(idx + 1); }, 500);
-              }).catch(function() { pasteNext(idx + 1); });
-            } catch(_) { pasteNext(idx + 1); }
-          })(0);
-        } else {
-          injectQuestion();
+          miniChatWindow.webContents.send('mini:reply', '图片请手动粘贴到主窗口');
         }
+        injectQuestion();
       } catch(_) {}
     }
     // 轮询回复，等到内容够长且稳定
