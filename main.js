@@ -3607,9 +3607,12 @@ function createMiniChat() {
     .header { padding:10px 14px; display:flex; justify-content:space-between; align-items:center;
       border-bottom:1px solid rgba(255,255,255,.06); -webkit-app-region:drag; }
     .header span { font-size:12px; color:#a1a1aa; }
-    .header-btns { display:flex; gap:6px; -webkit-app-region:no-drag; }
-    .header-btns button { background:none; border:none; color:#71717a; cursor:pointer; font-size:13px; padding:2px 6px; border-radius:4px; }
-    .header-btns button:hover { color:#e4e4e7; background:rgba(255,255,255,.06); }
+    .header-btns { display:flex; gap:4px; -webkit-app-region:no-drag; align-items:center; }
+    .header-btns button { background:rgba(255,255,255,.06); border:none; color:#a1a1aa; cursor:pointer; font-size:11px; padding:3px 8px; border-radius:6px; }
+    .header-btns button.mode { padding:3px 8px; }
+    .header-btns button.active { background:#4D6BFE; color:#fff; }
+    .header-btns button:hover { background:rgba(255,255,255,.12); }
+    .header-btns button.active:hover { background:#4D6BFE; }
     .msgs { flex:1; overflow-y:auto; padding:12px 14px; }
     .msg { margin:6px 0; padding:8px 12px; border-radius:12px; max-width:90%; word-break:break-word; }
     .msg.user { background:#4D6BFE; color:#fff; margin-left:auto; text-align:right; }
@@ -3622,7 +3625,11 @@ function createMiniChat() {
       color:#fff; cursor:pointer; font-weight:600; font-size:13px; white-space:nowrap; }
   </style></head><body>
     <div class="header">
-      <span>DeepSeek 对话</span>
+      <div class="header-btns">
+        <button class="mode active" data-mode="default" onclick="setMode('default',this)">默认</button>
+        <button class="mode" data-mode="expert" onclick="setMode('expert',this)">专家</button>
+        <button class="mode" data-mode="vision" onclick="setMode('vision',this)">识图</button>
+      </div>
       <div class="header-btns">
         <button onclick="newChat()" title="新对话">＋</button>
         <button onclick="closeWin()" title="关闭">✕</button>
@@ -3635,6 +3642,12 @@ function createMiniChat() {
     </div>
     <script>
       const { ipcRenderer } = require('electron');
+      var currentMode = 'default';
+      function setMode(m, btn) {
+        currentMode = m;
+        document.querySelectorAll('.mode').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+      }
       function ask() {
         var q = document.getElementById('q').value.trim();
         if (!q) return;
@@ -3642,7 +3655,7 @@ function createMiniChat() {
         document.getElementById('msgs').innerHTML += '<div class="msg ai loading" id="loading">思考中...</div>';
         document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
         document.getElementById('q').value = '';
-        ipcRenderer.send('mini:ask', q);
+        ipcRenderer.send('mini:ask', { q: q, mode: currentMode });
       }
       function newChat() { ipcRenderer.send('mini:newchat'); document.getElementById('msgs').innerHTML=''; }
       function closeWin() { ipcRenderer.send('mini:close'); }
@@ -3682,27 +3695,37 @@ function createMiniChat() {
     }
   });
 
-  ipcMain.on('mini:ask', function(_, question) {
+  ipcMain.on('mini:ask', function(_, payload) {
+    var question = typeof payload === 'string' ? payload : payload.q;
+    var mode = (payload && payload.mode) || 'default';
     if (mainWindow && !mainWindow.isDestroyed()) {
       try {
+        // 切模式后再发消息
         mainWindow.webContents.executeJavaScript(`
           (async function() {
             var chatView = document.getElementById('chatView');
             if (!chatView || typeof chatView.executeJavaScript !== 'function') return;
             var q = ${JSON.stringify(question)};
+            var m = ${JSON.stringify(mode)};
             await chatView.executeJavaScript(
-              '(function(){var p=' + JSON.stringify(q) + ';' +
+              '(function(){' +
+              'var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");' +
+              'var modeMap={"default":"默认","DEFAULT":"默认","expert":"专家","EXPERT":"专家","vision":"识图","VISION":"识图"};' +
+              'var target=modeMap[m]||"默认";' +
+              'for(var i=0;i<modeBtns.length;i++){if((modeBtns[i].textContent||"").trim().indexOf(target)>=0){modeBtns[i].click();break;}}' +
+              'setTimeout(function(){' +
               'var ta=document.querySelector("textarea");if(!ta)return;' +
               'var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;' +
-              'ns.call(ta,"");ns.call(ta,p);ta.focus();' +
-              'ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:p}));' +
-              'ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:p}));' +
+              'ns.call(ta,"");ns.call(ta,q);ta.focus();' +
+              'ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:q}));' +
+              'ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:q}));' +
               'ta.dispatchEvent(new Event("change",{bubbles:true}));' +
               'var btns=document.querySelectorAll("button");var sBtn=null;' +
               'for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("发送")>=0||txt==="send"||txt==="发送"){sBtn=b;break;}}' +
               'if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}' +
               'if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}' +
               'ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));' +
+              '},300);' +
               '})()'
             );
           })()
