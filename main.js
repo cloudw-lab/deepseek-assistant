@@ -3509,22 +3509,27 @@ function createDesktopPet() {
 
   // Phase 2: 检测自动化任务完成
   console.log('[Pet] polling started');
-  var lastAutoDone = getAutomationState().runs.filter(function(r){return r&&r.status==='succeeded'}).length;
+  var knownAutoIds = {};
+  var initRuns = getAutomationState().runs;
+  for (var i=0;i<initRuns.length;i++) {
+    if (initRuns[i]&&initRuns[i].id) knownAutoIds[initRuns[i].id] = true;
+  }
   var petPollTimer = setInterval(function() {
     if (!petWindow || petWindow.isDestroyed()) {
-      console.log('[Pet] poll stopped - window destroyed');
       clearInterval(petPollTimer);
       return;
     }
     var runs = getAutomationState().runs;
-    var statuses = runs.map(function(r){return r?.status}).join(',');
-    var done = runs.filter(function(r){return r&&r.status==='succeeded'}).length;
-    if (done > lastAutoDone) {
-      console.log('[Pet] automation done detected! count=', done, 'last=', lastAutoDone);
-      petWindow.webContents.send('pet:bubble', '定时任务已完成！');
+    for (var j=0;j<runs.length;j++) {
+      var r = runs[j];
+      if (r && r.status==='succeeded' && r.id && !knownAutoIds[r.id]) {
+        knownAutoIds[r.id] = true;
+        var name = (r.automationName||'').slice(0,20) || '定时任务';
+        petWindow.webContents.send('pet:bubble', name+'已完成！');
+        console.log('[Pet] new automation done:', r.id, name);
+        break;
+      }
     }
-    lastAutoDone = done;
-    if (statuses) console.log('[Pet] auto runs statuses:', statuses);
   }, 3000);
 
   ipcMain.removeAllListeners('pet:move');
