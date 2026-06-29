@@ -3717,16 +3717,21 @@ function createMiniChat() {
           }
         }
       });
-      ipcRenderer.on('mini:imagePicked', function(_, path) {
+      ipcRenderer.on('mini:imagePicked', function(_, result) {
+        if (!result) return;
+        var path = typeof result === 'string' ? result : result.path;
+        var dataUrl = typeof result === 'string' ? '' : result.dataUrl;
         if (!path) return;
         imagePaths.push(path);
         var preview = document.getElementById('imgPreview');
-        preview.innerHTML += '<div style="display:flex;align-items:center;gap:4px"><img src="file://'+path.replace(/\\\\/g,'/')+'" onclick="this.parentElement.remove();imagePaths=imagePaths.filter(function(p){return p!=='+JSON.stringify(path)+'})" title="点击移除" style="width:48px;height:48px;border-radius:6px;object-fit:cover;cursor:pointer"><span style="font-size:10px;color:#6B8AFF">图片已附加，点击发送</span></div>';
+        var displayUrl = dataUrl || ('file://' + path.replace(/\\\\/g,'/'));
+        preview.innerHTML += '<div style="display:flex;align-items:center;gap:4px"><img src="'+displayUrl.replace(/"/g,'&quot;')+'" onclick="this.parentElement.remove();var idx=imagePaths.indexOf(\''+path.replace(/'/g,"\\'").replace(/\\\\/g,'\\\\')+'\');if(idx>=0)imagePaths.splice(idx,1)" title="点击移除" style="width:48px;height:48px;border-radius:6px;object-fit:cover;cursor:pointer"><span style="font-size:10px;color:#6B8AFF">图片已附加，点击发送</span></div>';
+        document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
       });
       function ask() {
         var q = document.getElementById('q').value.trim();
-        if (!q) return;
-        document.getElementById('msgs').innerHTML += '<div class="msg user">'+q.replace(/</g,'&lt;')+'</div>';
+        if (!q && imagePaths.length === 0) return;
+        document.getElementById('msgs').innerHTML += '<div class="msg user">'+(q||'[图片]').replace(/</g,'&lt;')+'</div>';
         document.getElementById('msgs').innerHTML += '<div class="msg ai loading" id="loading">思考中...</div>';
         document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
         document.getElementById('q').value = '';
@@ -3765,7 +3770,12 @@ function createMiniChat() {
       filters: [{ name: 'Images', extensions: ['png','jpg','jpeg','gif','webp'] }]
     }).then(function(result) {
       if (!result.canceled && result.filePaths.length > 0) {
-        miniChatWindow.webContents.send('mini:imagePicked', result.filePaths[0]);
+        var p = result.filePaths[0];
+        var buf = require('fs').readFileSync(p);
+        var ext = require('path').extname(p).toLowerCase();
+        var mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
+        var dataUrl = 'data:' + mime + ';base64,' + buf.toString('base64');
+        miniChatWindow.webContents.send('mini:imagePicked', { path: p, dataUrl: dataUrl });
       }
     });
   });
@@ -3774,7 +3784,7 @@ function createMiniChat() {
     var buf = Buffer.from(dataUrl.split(',')[1], 'base64');
     var tmpPath = require('path').join(require('os').tmpdir(), 'deepseek-paste-' + Date.now() + '.png');
     require('fs').writeFileSync(tmpPath, buf);
-    if (miniChatWindow) miniChatWindow.webContents.send('mini:imagePicked', tmpPath);
+    if (miniChatWindow) miniChatWindow.webContents.send('mini:imagePicked', { path: tmpPath, dataUrl: dataUrl });
   });
 
   ipcMain.on('mini:newchat', function() {
