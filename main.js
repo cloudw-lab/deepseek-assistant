@@ -3839,40 +3839,12 @@ function createMiniChat() {
         }
         console.log('[MiniChat] wcid=' + wcid + ' injecting question');
 
-        // Paste images via clipboard + sendInputEvent
+        // If images, just focus main window for manual paste - no auto-paste
         if (images.length > 0) {
-          console.log('[MiniChat] pasting ' + images.length + ' images');
-          var nativeImage = require('electron').nativeImage;
-          var clipboard = require('electron').clipboard;
-          var prevImg = clipboard.readImage();
-          var prevText = clipboard.readText();
-          (function pasteNext(idx) {
-            if (idx >= images.length) {
-              // All pasted, proceed with question
-              setTimeout(function() { injectAndPoll(true); }, 500);
-              // Restore after a bit
-              setTimeout(function() {
-                clipboard.writeImage(prevImg);
-                clipboard.writeText(prevText);
-              }, 1000);
-              return;
-            }
-            try {
-              var img = nativeImage.createFromPath(images[idx]);
-              if (!img.isEmpty()) {
-                clipboard.writeImage(img);
-                // Focus webview and send Cmd+V
-                wc.focus();
-                wc.sendInputEvent({ type: 'keyDown', keyCode: 'v', modifiers: ['meta'] });
-                wc.sendInputEvent({ type: 'keyUp', keyCode: 'v', modifiers: ['meta'] });
-                console.log('[MiniChat] image ' + idx + ' pasted');
-              }
-            } catch(e) { console.log('[MiniChat] paste err:', e.message); }
-            setTimeout(function() { pasteNext(idx + 1); }, 600);
-          })(0);
-        } else {
-          injectAndPoll(false);
+          console.log('[MiniChat] ' + images.length + ' images - focus main window');
+          if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
         }
+        injectAndPoll(images.length > 0);
 
         function injectAndPoll(hasImages) {
           var code = '(' + (function(){
