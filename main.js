@@ -3824,33 +3824,44 @@ function createMiniChat() {
         function injectQuestion() {
           mainWindow.webContents.executeJavaScript(`
             (async function() {
-              var chatView = document.getElementById('chatView');
-              if (!chatView || typeof chatView.executeJavaScript !== 'function') return;
-              await chatView.executeJavaScript(
-                '(function(){' +
-                'var q = ${JSON.stringify(question)};' +
-                'var m = ${JSON.stringify(mode)};' +
-                'var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");' +
-                'var modeMap={"default":"默认","DEFAULT":"默认","expert":"专家","EXPERT":"专家","vision":"识图","VISION":"识图"};' +
-                'var target=modeMap[m]||"默认";' +
-                'for(var i=0;i<modeBtns.length;i++){if((modeBtns[i].textContent||"").trim().indexOf(target)>=0){modeBtns[i].click();break;}}' +
-                'setTimeout(function(){' +
-                'var ta=document.querySelector("textarea");if(!ta)return;' +
-                'var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;' +
-                'ns.call(ta,"");ns.call(ta,q);ta.focus();' +
-                'ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:q}));' +
-                'ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:q}));' +
-                'ta.dispatchEvent(new Event("change",{bubbles:true}));' +
-                'var btns=document.querySelectorAll("button");var sBtn=null;' +
-                'for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("发送")>=0||txt==="send"||txt==="发送"){sBtn=b;break;}}' +
-                'if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}' +
-                'if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}' +
-                'ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));' +
-                '},300);' +
-                '})()'
-              );
+              try {
+                var chatView = document.getElementById('chatView');
+                if (!chatView) return 'no chatView';
+                if (typeof chatView.executeJavaScript !== 'function') return 'no execJS';
+                var result = await chatView.executeJavaScript(
+                  '(function(){' +
+                  'var q = ${JSON.stringify(question)};' +
+                  'var m = ${JSON.stringify(mode)};' +
+                  'var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");' +
+                  'var modeMap={"default":"默认","DEFAULT":"默认","expert":"专家","EXPERT":"专家","vision":"识图","VISION":"识图"};' +
+                  'var target=modeMap[m]||"默认";' +
+                  'for(var i=0;i<modeBtns.length;i++){if((modeBtns[i].textContent||"").trim().indexOf(target)>=0){modeBtns[i].click();break;}}' +
+                  'setTimeout(function(){' +
+                  'var ta=document.querySelector("textarea");if(!ta)return;' +
+                  'var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;' +
+                  'ns.call(ta,"");ns.call(ta,q);ta.focus();' +
+                  'ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:q}));' +
+                  'ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:q}));' +
+                  'ta.dispatchEvent(new Event("change",{bubbles:true}));' +
+                  'var btns=document.querySelectorAll("button");var sBtn=null;' +
+                  'for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("发送")>=0||txt==="send"||txt==="发送"){sBtn=b;break;}}' +
+                  'if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}' +
+                  'if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}' +
+                  'ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));' +
+                  '},300);' +
+                  'return "injected";' +
+                  '})()'
+                );
+                return result || 'no result';
+              } catch(e) { return 'err: ' + e.message; }
             })()
-          `);
+          `).then(function(result) {
+            if (result && result !== 'injected') {
+              console.log('[MiniChat] inject result:', result);
+            }
+          }).catch(function(e) {
+            console.log('[MiniChat] inject failed:', e.message);
+          });
         }
 
         if (images.length > 0) {
