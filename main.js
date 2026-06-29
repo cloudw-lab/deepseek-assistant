@@ -3650,11 +3650,14 @@ function createMiniChat() {
       var currentMode = 'default';
       var imagePaths = [];
       function setMode(m, btn) {
-        currentMode = m;
-        document.querySelectorAll('.mode').forEach(function(b){ b.classList.remove('active'); });
-        btn.classList.add('active');
-        // 只识图模式显示上传按钮
-        document.getElementById('imgBtn').style.display = m==='vision' ? '' : 'none';
+        try {
+          currentMode = m;
+          var all = document.querySelectorAll('.mode');
+          for (var i = 0; i < all.length; i++) { all[i].classList.remove('active'); }
+          btn.classList.add('active');
+          var imgBtn = document.getElementById('imgBtn');
+          if (imgBtn) imgBtn.style.display = m === 'vision' ? '' : 'none';
+        } catch(e) { console.error('setMode error:', e); }
       }
       function pickImage() {
         ipcRenderer.send('mini:pickImage');
