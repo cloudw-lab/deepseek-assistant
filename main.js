@@ -3596,7 +3596,7 @@ function createMiniChat() {
     alwaysOnTop: true,
     resizable: true,
     skipTaskbar: true,
-    webPreferences: { nodeIntegration: true, contextIsolation: false },
+    webPreferences: { nodeIntegration: true, contextIsolation: false, sandbox: false },
   });
   miniChatWindow.setVisibleOnAllWorkspaces(true);
 
@@ -3711,7 +3711,12 @@ function createMiniChat() {
       });
     </script></body></html>`;
 
-  miniChatWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  // Write HTML to temp file and load via file:// (more reliable than data: URL)
+  var fs = require('fs');
+  var path = require('path');
+  var tmpHtml = path.join(require('os').tmpdir(), 'deepseek-mini-chat.html');
+  fs.writeFileSync(tmpHtml, html);
+  miniChatWindow.loadURL('file://' + tmpHtml);
   miniChatWindow.on('closed', function() { miniChatWindow = null; });
 
   ipcMain.removeAllListeners('mini:ask');
