@@ -3370,7 +3370,7 @@ app.whenReady().then(async () => {
 let petWindow = null;
 let lastActiveTime = Date.now();
 let lastGreetingTime = 0;
-let lastPetStatus = 'idle';
+let wasGenerating = false;
 
 function createDesktopPet() {
   if (petWindow && !petWindow.isDestroyed()) return;
@@ -3539,14 +3539,14 @@ function createDesktopPet() {
         if (state.status === 'generating') {
           petWindow.webContents.send('pet:status', 'thinking');
           lastActiveTime = now;
+          wasGenerating = true;
         } else {
-          // 刚从生成状态切换到空闲 → 任务完成通知
-          if (lastPetStatus === 'thinking') {
+          petWindow.webContents.send('pet:status', 'idle');
+          if (wasGenerating) {
+            wasGenerating = false;
             petWindow.webContents.send('pet:bubble', '任务已完成！');
           }
-          petWindow.webContents.send('pet:status', 'idle');
         }
-        lastPetStatus = petWindow && !petWindow.isDestroyed() ? (state.status === 'generating' ? 'thinking' : 'idle') : 'idle';
 
         // 空闲超时 → 瞌睡
         var idleSec = (now - lastActiveTime) / 1000;
@@ -3609,6 +3609,7 @@ function createDesktopPet() {
 
   ipcMain.on('pet:wakeup', function() {
     lastActiveTime = Date.now();
+    wasGenerating = false;
   });
 }
 
