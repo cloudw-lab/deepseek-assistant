@@ -3581,6 +3581,7 @@ function createDesktopPet() {
 }
 
 let miniChatWindow = null;
+let miniChatPollTimer = null;
 
 function createMiniChat() {
   if (miniChatWindow && !miniChatWindow.isDestroyed()) {
@@ -3869,13 +3870,14 @@ function createMiniChat() {
       } catch(_) {}
     }
     // 轮询回复，等到内容够长且稳定
+    if (miniChatPollTimer) { clearInterval(miniChatPollTimer); miniChatPollTimer = null; }
     var lastText = '';
     var stable = 0;
     var attempts = 0;
-    var timer = setInterval(function() {
+    miniChatPollTimer = setInterval(function() {
       attempts++;
       if (!mainWindow || mainWindow.isDestroyed() || !miniChatWindow || miniChatWindow.isDestroyed()) {
-        clearInterval(timer); return;
+        clearInterval(miniChatPollTimer); miniChatPollTimer = null; return;
       }
       try {
         mainWindow.webContents.executeJavaScript(`
@@ -3897,15 +3899,20 @@ function createMiniChat() {
             lastText = text;
             stable = 0;
           }
-          // 每5次尝试更新状态
-          if (attempts % 5 === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
+          // 每15次尝试更新状态
+          if (attempts % 15 === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
             miniChatWindow.webContents.send('mini:reply', '...(' + attempts + ')');
           }
           // 稳定4次(8秒)或超过60次尝试(120秒)，返回结果
           if ((stable >= 4 || attempts > 60) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
-            clearInterval(timer);
+            clearInterval(miniChatPollTimer); miniChatPollTimer = null;
             var answer = lastText.replace(/温馨提示[：:][\\s\\S]*$/g,'').replace(/\\n{3,}/g,'\\n\\n').trim();
             miniChatWindow.webContents.send('mini:reply', answer);
+          }
+          // 如果超过90次还没有任何结果，返回超时
+          if (attempts > 90 && lastText.length === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
+            clearInterval(miniChatPollTimer); miniChatPollTimer = null;
+            miniChatWindow.webContents.send('mini:reply', '未获取到回复，请检查主窗口');
           }
         }).catch(function(e){
           console.log('[MiniChat] poll error:', e.message);
@@ -3916,6 +3923,7 @@ function createMiniChat() {
   });
 
   ipcMain.on('mini:close', function() {
+    if (miniChatPollTimer) { clearInterval(miniChatPollTimer); miniChatPollTimer = null; }
     if (miniChatWindow) { miniChatWindow.close(); miniChatWindow = null; }
   });
 
