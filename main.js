@@ -1075,6 +1075,8 @@ function startExtensionFileServer(port = 9998) {
           }
           var html = fs.readFileSync(fullPath, 'utf8');
           html = html.replace('<head>', '<head>' + cachedSidepanelInjection);
+          // 隐藏侧边栏"对话"页签（第一个导航项）
+          html = html.replace('</body>', '<script>setTimeout(function(){var nav=document.querySelector("nav");if(nav){var btns=nav.querySelectorAll("button,a,[role=tab]");if(btns[0])btns[0].style.display="none";}},500)</script></body>');
           res.writeHead(200);
           res.end(html);
         } else {
