@@ -3623,6 +3623,9 @@ function createMiniChat() {
       padding:8px 12px; color:#fff; outline:none; resize:none; font:13px/1.5 -apple-system,sans-serif; height:36px; }
     .input-row button { background:#4D6BFE; border:none; border-radius:10px; padding:8px 16px;
       color:#fff; cursor:pointer; font-weight:600; font-size:13px; white-space:nowrap; }
+    .input-row button.img-btn { background:rgba(255,255,255,.08); padding:8px 10px; font-size:16px; }
+    .img-preview { display:flex; gap:4px; padding:4px 14px; flex-wrap:wrap; }
+    .img-preview img { width:48px; height:48px; border-radius:6px; object-fit:cover; border:1px solid rgba(255,255,255,.1); }
   </style></head><body>
     <div class="header">
       <div class="header-btns">
@@ -3637,25 +3640,40 @@ function createMiniChat() {
     </div>
     <div class="msgs" id="msgs"></div>
     <div class="input-row">
+      <button class="img-btn" onclick="pickImage()" title="上传图片">🖼️</button>
       <textarea id="q" placeholder="输入问题，Enter 发送..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ask()}"></textarea>
       <button onclick="ask()">发送</button>
     </div>
+    <div class="img-preview" id="imgPreview"></div>
     <script>
       const { ipcRenderer } = require('electron');
       var currentMode = 'default';
+      var imagePaths = [];
       function setMode(m, btn) {
         currentMode = m;
         document.querySelectorAll('.mode').forEach(function(b){ b.classList.remove('active'); });
         btn.classList.add('active');
       }
+      function pickImage() {
+        ipcRenderer.send('mini:pickImage');
+      }
+      ipcRenderer.on('mini:imagePicked', function(_, path) {
+        if (!path) return;
+        imagePaths.push(path);
+        var preview = document.getElementById('imgPreview');
+        preview.innerHTML += '<img src="file://'+path+'" onclick="this.remove();imagePaths=imagePaths.filter(function(p){return p!=='+JSON.stringify(path)+'})" title="点击移除">';
+      });
       function ask() {
         var q = document.getElementById('q').value.trim();
-        if (!q) return;
+        if (!q && imagePaths.length === 0) return;
+        if (!q && imagePaths.length > 0) q = '分析这张图片';
         document.getElementById('msgs').innerHTML += '<div class="msg user">'+q.replace(/</g,'&lt;')+'</div>';
         document.getElementById('msgs').innerHTML += '<div class="msg ai loading" id="loading">思考中...</div>';
         document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
         document.getElementById('q').value = '';
-        ipcRenderer.send('mini:ask', { q: q, mode: currentMode });
+        ipcRenderer.send('mini:ask', { q: q, mode: currentMode, images: imagePaths.slice() });
+        imagePaths = [];
+        document.getElementById('imgPreview').innerHTML = '';
       }
       function newChat() { ipcRenderer.send('mini:newchat'); document.getElementById('msgs').innerHTML=''; }
       function closeWin() { ipcRenderer.send('mini:close'); }
@@ -3673,6 +3691,19 @@ function createMiniChat() {
   ipcMain.removeAllListeners('mini:ask');
   ipcMain.removeAllListeners('mini:close');
   ipcMain.removeAllListeners('mini:newchat');
+  ipcMain.removeAllListeners('mini:pickImage');
+
+  ipcMain.on('mini:pickImage', function() {
+    const { dialog } = require('electron');
+    dialog.showOpenDialog(miniChatWindow, {
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['png','jpg','jpeg','gif','webp'] }]
+    }).then(function(result) {
+      if (!result.canceled && result.filePaths.length > 0) {
+        miniChatWindow.webContents.send('mini:imagePicked', result.filePaths[0]);
+      }
+    });
+  });
 
   ipcMain.on('mini:newchat', function() {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -3700,7 +3731,6 @@ function createMiniChat() {
     var mode = (payload && payload.mode) || 'default';
     if (mainWindow && !mainWindow.isDestroyed()) {
       try {
-        // 切模式后再发消息
         mainWindow.webContents.executeJavaScript(`
           (async function() {
             var chatView = document.getElementById('chatView');
