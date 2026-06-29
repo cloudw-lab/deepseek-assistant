@@ -3740,7 +3740,9 @@ function createMiniChat() {
         var q = document.getElementById('q').value.trim();
         if (!q && imagePaths.length === 0) return;
         document.getElementById('msgs').innerHTML += '<div class="msg user">'+(q||'[图片]').replace(/</g,'&lt;')+'</div>';
-        document.getElementById('msgs').innerHTML += '<div class="msg ai loading" id="loading">思考中...</div>';
+        if (q) {
+          document.getElementById('msgs').innerHTML += '<div class="msg ai loading" id="loading">思考中...</div>';
+        }
         document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
         document.getElementById('q').value = '';
         ipcRenderer.send('mini:ask', { q: q, mode: currentMode, images: imagePaths.slice() });
@@ -3843,40 +3845,38 @@ function createMiniChat() {
         if (images.length > 0) {
           console.log('[MiniChat] ' + images.length + ' images - focus main window');
           if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
+          if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '图片请粘贴到主窗口');
         }
-        injectAndPoll(images.length > 0);
+        // Only inject text if there IS text
+        if (question) {
+          injectAndPoll();
+        } else if (images.length === 0) {
+          return; // Nothing to do
+        }
 
-        function injectAndPoll(hasImages) {
+        function injectAndPoll() {
           var code = '(' + (function(){
             var q='PLACEHOLDER_Q';
             var m='PLACEHOLDER_M';
-            var HAS_IMAGES = false;
             var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");
             var modeMap={"default":"\u9ed8\u8ba4","DEFAULT":"\u9ed8\u8ba4","expert":"\u4e13\u5bb6","EXPERT":"\u4e13\u5bb6","vision":"\u8bc6\u56fe","VISION":"\u8bc6\u56fe"};
             var target=modeMap[m]||"\u9ed8\u8ba4";
             for(var i=0;i<modeBtns.length;i++){if((modeBtns[i].textContent||"").trim().indexOf(target)>=0){modeBtns[i].click();break;}}
-            if (!q && !HAS_IMAGES) return;
             setTimeout(function(){
               var ta=document.querySelector("textarea");if(!ta)return;
               var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;
-              if (q) {
-                ns.call(ta,"");ns.call(ta,q);ta.focus();
-                ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:q}));
-                ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:q}));
-                ta.dispatchEvent(new Event("change",{bubbles:true}));
-              } else {
-                ta.focus();
-              }
+              ns.call(ta,"");ns.call(ta,q);ta.focus();
+              ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:q}));
+              ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:q}));
+              ta.dispatchEvent(new Event("change",{bubbles:true}));
               var btns=document.querySelectorAll("button");var sBtn=null;
               for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("\u53d1\u9001")>=0||txt==="send"||txt==="\u53d1\u9001"){sBtn=b;break;}}
               if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}
               if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}
-              if (q) ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
+              ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             },300);
           }).toString() + ')()';
-          code = code.replace('PLACEHOLDER_Q', JSON.stringify(question || ''))
-            .replace('PLACEHOLDER_M', JSON.stringify(mode))
-            .replace('HAS_IMAGES = false', 'HAS_IMAGES = ' + (hasImages ? 'true' : 'false'));
+          code = code.replace('PLACEHOLDER_Q', JSON.stringify(question)).replace('PLACEHOLDER_M', JSON.stringify(mode));
           wc.executeJavaScript(code);
         }
 
