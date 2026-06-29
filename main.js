@@ -3589,8 +3589,8 @@ function createMiniChat() {
     return;
   }
   miniChatWindow = new BrowserWindow({
-    width: 420,
-    height: 320,
+    width: 460,
+    height: 520,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -3602,26 +3602,35 @@ function createMiniChat() {
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:rgba(30,30,30,.92); border-radius:16px; overflow:hidden;
-      font:13px/1.5 -apple-system,sans-serif; color:#e0e0e0; display:flex; flex-direction:column; height:100vh; }
-    .header { padding:8px 14px; display:flex; justify-content:space-between; align-items:center;
-      border-bottom:1px solid rgba(255,255,255,.08); -webkit-app-region:drag; }
-    .header span { font-size:12px; color:#999; }
-    .header button { background:none; border:none; color:#666; cursor:pointer; font-size:14px; -webkit-app-region:no-drag; }
-    .msgs { flex:1; overflow-y:auto; padding:12px; }
-    .input-row { display:flex; padding:8px 12px; gap:8px; border-top:1px solid rgba(255,255,255,.08); }
-    .input-row input { flex:1; background:rgba(255,255,255,.1); border:none; border-radius:8px;
-      padding:8px 12px; color:#fff; outline:none; }
-    .input-row button { background:#4D6BFE; border:none; border-radius:8px; padding:8px 14px;
-      color:#fff; cursor:pointer; font-weight:600; }
+    body { background:rgba(24,24,27,.94); border-radius:16px; overflow:hidden;
+      font:13px/1.6 -apple-system,sans-serif; color:#e4e4e7; display:flex; flex-direction:column; height:100vh; }
+    .header { padding:10px 14px; display:flex; justify-content:space-between; align-items:center;
+      border-bottom:1px solid rgba(255,255,255,.06); -webkit-app-region:drag; }
+    .header span { font-size:12px; color:#a1a1aa; }
+    .header-btns { display:flex; gap:6px; -webkit-app-region:no-drag; }
+    .header-btns button { background:none; border:none; color:#71717a; cursor:pointer; font-size:13px; padding:2px 6px; border-radius:4px; }
+    .header-btns button:hover { color:#e4e4e7; background:rgba(255,255,255,.06); }
+    .msgs { flex:1; overflow-y:auto; padding:12px 14px; }
+    .msg { margin:6px 0; padding:8px 12px; border-radius:12px; max-width:90%; word-break:break-word; }
+    .msg.user { background:#4D6BFE; color:#fff; margin-left:auto; text-align:right; }
+    .msg.ai { background:rgba(63,63,70,.7); color:#e4e4e7; margin-right:auto; }
+    .msg.ai.loading { opacity:.5; }
+    .input-row { display:flex; padding:10px 14px; gap:8px; border-top:1px solid rgba(255,255,255,.06); }
+    .input-row textarea { flex:1; background:rgba(255,255,255,.06); border:none; border-radius:10px;
+      padding:8px 12px; color:#fff; outline:none; resize:none; font:13px/1.5 -apple-system,sans-serif; height:36px; }
+    .input-row button { background:#4D6BFE; border:none; border-radius:10px; padding:8px 16px;
+      color:#fff; cursor:pointer; font-weight:600; font-size:13px; white-space:nowrap; }
   </style></head><body>
     <div class="header">
-      <span>快速提问</span>
-      <button onclick="closeWin()">✕</button>
+      <span>DeepSeek 对话</span>
+      <div class="header-btns">
+        <button onclick="newChat()" title="新对话">＋</button>
+        <button onclick="closeWin()" title="关闭">✕</button>
+      </div>
     </div>
     <div class="msgs" id="msgs"></div>
     <div class="input-row">
-      <input id="q" placeholder="输入问题..." onkeydown="if(event.key==='Enter')ask()">
+      <textarea id="q" placeholder="输入问题，Enter 发送..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ask()}"></textarea>
       <button onclick="ask()">发送</button>
     </div>
     <script>
@@ -3629,13 +3638,18 @@ function createMiniChat() {
       function ask() {
         var q = document.getElementById('q').value.trim();
         if (!q) return;
-        document.getElementById('msgs').innerHTML += '<div style="text-align:right;color:#4D6BFE;margin:4px 0">'+q+'</div>';
+        document.getElementById('msgs').innerHTML += '<div class="msg user">'+q.replace(/</g,'&lt;')+'</div>';
+        document.getElementById('msgs').innerHTML += '<div class="msg ai loading" id="loading">思考中...</div>';
+        document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
         document.getElementById('q').value = '';
         ipcRenderer.send('mini:ask', q);
       }
+      function newChat() { ipcRenderer.send('mini:newchat'); document.getElementById('msgs').innerHTML=''; }
       function closeWin() { ipcRenderer.send('mini:close'); }
       ipcRenderer.on('mini:reply', function(_, text) {
-        document.getElementById('msgs').innerHTML += '<div style="margin:4px 0">'+text+'</div>';
+        var loading = document.getElementById('loading');
+        if (loading) loading.remove();
+        document.getElementById('msgs').innerHTML += '<div class="msg ai">'+text.replace(/</g,'&lt;')+'</div>';
         document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
       });
     </script></body></html>`;
@@ -3645,6 +3659,28 @@ function createMiniChat() {
 
   ipcMain.removeAllListeners('mini:ask');
   ipcMain.removeAllListeners('mini:close');
+  ipcMain.removeAllListeners('mini:newchat');
+
+  ipcMain.on('mini:newchat', function() {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        mainWindow.webContents.executeJavaScript(`
+          (async function(){
+            var chatView = document.getElementById('chatView');
+            if (!chatView) return;
+            await chatView.executeJavaScript(
+              '(function(){' +
+              'var btn=document.querySelector("[aria-label=\\"New chat\\"], [aria-label=\\"新对话\\"]");' +
+              'if(!btn){var as=document.querySelectorAll("a");for(var i=0;i<as.length;i++){if(as[i].href&&as[i].href.indexOf("/chat")>=0&&!as[i].href.includes("/s/")){btn=as[i];break;}}}' +
+              'if(btn)btn.click();' +
+              'else{window.location.href="https://chat.deepseek.com/";}' +
+              '})()'
+            );
+          })()
+        `);
+      } catch(_) {}
+    }
+  });
 
   ipcMain.on('mini:ask', function(_, question) {
     if (mainWindow && !mainWindow.isDestroyed()) {
