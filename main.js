@@ -3819,6 +3819,7 @@ function createMiniChat() {
     var question = typeof payload === 'string' ? payload : payload.q;
     var mode = (payload && payload.mode) || 'default';
     var images = (payload && payload.images) || [];
+    console.log('[MiniChat] ask q=' + (question||'').substring(0,30) + ' mode=' + mode + ' imgs=' + images.length);
     if (mainWindow && !mainWindow.isDestroyed()) {
       try {
         function injectQuestion() {
@@ -3860,7 +3861,7 @@ function createMiniChat() {
               console.log('[MiniChat] inject result:', result);
             }
           }).catch(function(e) {
-            console.log('[MiniChat] inject failed:', e.message);
+            console.log('[MiniChat] inject execJS failed:', e.message);
           });
         }
 
@@ -3886,16 +3887,10 @@ function createMiniChat() {
             if(!chatView)return"";
                 return await chatView.executeJavaScript(
                   '(function(){var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
-                  'if(!roots.length)return"";' +
-                  'var allText="";' +
-                  'for(var i=0;i<roots.length;i++){' +
-                  'var r=roots[i].cloneNode(true);' +
+                  'if(!roots.length)return"";var r=roots[roots.length-1].cloneNode(true);' +
                   'var nodes=r.querySelectorAll(".dpp-tool-block,.dpp-agent-container");' +
-                  'for(var j=0;j<nodes.length;j++)nodes[j].remove();' +
-                  'var t=(r.textContent||"").trim();' +
-                  'if(t.length>0&&t.indexOf("搜索")!==0&&t.indexOf("正在")!==0)allText+=t+"\\n";' +
-                  '}' +
-                  'return allText.trim();})()'
+                  'for(var i=0;i<nodes.length;i++)nodes[i].remove();' +
+                  'return (r.textContent||"").trim();})()'
                 );
           })()
         `).then(function(text) {
@@ -3905,9 +3900,9 @@ function createMiniChat() {
             lastText = text;
             stable = 0;
           }
-          // 每10次尝试更新状态
-          if (attempts % 10 === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
-            miniChatWindow.webContents.send('mini:reply', '查询中...(' + attempts + ')');
+          // 每5次尝试更新状态
+          if (attempts % 5 === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
+            miniChatWindow.webContents.send('mini:reply', '...(' + attempts + ')');
           }
           // 稳定4次(8秒)或超过60次尝试(120秒)，返回结果
           if ((stable >= 4 || attempts > 60) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
@@ -3915,7 +3910,9 @@ function createMiniChat() {
             var answer = lastText.replace(/温馨提示[：:][\\s\\S]*$/g,'').replace(/\\n{3,}/g,'\\n\\n').trim();
             miniChatWindow.webContents.send('mini:reply', answer);
           }
-        }).catch(function(){});
+        }).catch(function(e){
+          console.log('[MiniChat] poll error:', e.message);
+        });
       } catch(_) {}
     }, 2000);
     if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '查询中...');
