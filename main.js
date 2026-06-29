@@ -3822,104 +3822,97 @@ function createMiniChat() {
     var images = (payload && payload.images) || [];
     console.log('[MiniChat] ask q=' + (question||'').substring(0,30) + ' mode=' + mode + ' imgs=' + images.length);
     if (mainWindow && !mainWindow.isDestroyed()) {
-      try {
-        function injectQuestion() {
-          mainWindow.webContents.executeJavaScript(`
-            (async function() {
-              try {
-                var chatView = document.getElementById('chatView');
-                if (!chatView) return 'no chatView';
-                if (typeof chatView.executeJavaScript !== 'function') return 'no execJS';
-                var result = await chatView.executeJavaScript(
-                  '(function(){' +
-                  'var q = ${JSON.stringify(question)};' +
-                  'var m = ${JSON.stringify(mode)};' +
-                  'var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");' +
-                  'var modeMap={"default":"默认","DEFAULT":"默认","expert":"专家","EXPERT":"专家","vision":"识图","VISION":"识图"};' +
-                  'var target=modeMap[m]||"默认";' +
-                  'for(var i=0;i<modeBtns.length;i++){if((modeBtns[i].textContent||"").trim().indexOf(target)>=0){modeBtns[i].click();break;}}' +
-                  'setTimeout(function(){' +
-                  'var ta=document.querySelector("textarea");if(!ta)return;' +
-                  'var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;' +
-                  'ns.call(ta,"");ns.call(ta,q);ta.focus();' +
-                  'ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:q}));' +
-                  'ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:q}));' +
-                  'ta.dispatchEvent(new Event("change",{bubbles:true}));' +
-                  'var btns=document.querySelectorAll("button");var sBtn=null;' +
-                  'for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("发送")>=0||txt==="send"||txt==="发送"){sBtn=b;break;}}' +
-                  'if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}' +
-                  'if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}' +
-                  'ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));' +
-                  '},300);' +
-                  'return "injected";' +
-                  '})()'
-                );
-                return result || 'no result';
-              } catch(e) { return 'err: ' + e.message; }
-            })()
-          `).then(function(result) {
-            if (result && result !== 'injected') {
-              console.log('[MiniChat] inject result:', result);
-            }
-          }).catch(function(e) {
-            console.log('[MiniChat] inject execJS failed:', e.message);
-          });
+      // Get webview's webContentsId, then inject and poll directly
+      mainWindow.webContents.executeJavaScript(
+        '(function(){var cv=document.getElementById("chatView");return cv?cv.getWebContentsId():-1})()'
+      ).then(function(wcid) {
+        if (wcid <= 0) {
+          console.log('[MiniChat] no chatView webContents');
+          if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '主窗口未就绪');
+          return;
         }
+        var wc = require('electron').webContents.fromId(wcid);
+        if (!wc || wc.isDestroyed()) {
+          console.log('[MiniChat] webContents not found');
+          if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '主窗口未就绪');
+          return;
+        }
+        console.log('[MiniChat] wcid=' + wcid + ' injecting question');
 
-        injectQuestion();
-      } catch(_) {}
+        // Inject question into webview
+        var code = '(' + (function(){
+          var q='PLACEHOLDER_Q';
+          var m='PLACEHOLDER_M';
+          var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");
+          var modeMap={"default":"\u9ed8\u8ba4","DEFAULT":"\u9ed8\u8ba4","expert":"\u4e13\u5bb6","EXPERT":"\u4e13\u5bb6","vision":"\u8bc6\u56fe","VISION":"\u8bc6\u56fe"};
+          var target=modeMap[m]||"\u9ed8\u8ba4";
+          for(var i=0;i<modeBtns.length;i++){if((modeBtns[i].textContent||"").trim().indexOf(target)>=0){modeBtns[i].click();break;}}
+          setTimeout(function(){
+            var ta=document.querySelector("textarea");if(!ta)return;
+            var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;
+            ns.call(ta,"");ns.call(ta,q);ta.focus();
+            ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:q}));
+            ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:q}));
+            ta.dispatchEvent(new Event("change",{bubbles:true}));
+            var btns=document.querySelectorAll("button");var sBtn=null;
+            for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("\u53d1\u9001")>=0||txt==="send"||txt==="\u53d1\u9001"){sBtn=b;break;}}
+            if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}
+            if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}
+            ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
+          },300);
+        }).toString() + ')()';
+        code = code.replace('PLACEHOLDER_Q', JSON.stringify(question)).replace('PLACEHOLDER_M', JSON.stringify(mode));
+        wc.executeJavaScript(code);
+
+        // Start polling via the same webContents
+        if (miniChatPollTimer) { clearInterval(miniChatPollTimer); miniChatPollTimer = null; }
+        var lastText = '';
+        var stable = 0;
+        var attempts = 0;
+        if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '\u67e5\u8be2\u4e2d...');
+        miniChatPollTimer = setInterval(function() {
+          attempts++;
+          if (!mainWindow || mainWindow.isDestroyed() || !miniChatWindow || miniChatWindow.isDestroyed()) {
+            clearInterval(miniChatPollTimer); miniChatPollTimer = null; return;
+          }
+          var pw = require('electron').webContents.fromId(wcid);
+          if (!pw || pw.isDestroyed()) {
+            clearInterval(miniChatPollTimer); miniChatPollTimer = null; return;
+          }
+          try {
+            pw.executeJavaScript(
+              '(function(){var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
+              'if(!roots.length)return"";var r=roots[roots.length-1].cloneNode(true);' +
+              'var nodes=r.querySelectorAll(".dpp-tool-block,.dpp-agent-container");' +
+              'for(var i=0;i<nodes.length;i++)nodes[i].remove();' +
+              'return (r.textContent||"").trim();})()'
+            ).then(function(text) {
+              if (text && text.length > 50 && text === lastText) {
+                stable++;
+              } else if (text && text.length > 50) {
+                lastText = text;
+                stable = 0;
+              }
+              if (attempts % 15 === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
+                miniChatWindow.webContents.send('mini:reply', '...(' + attempts + ')');
+              }
+              if ((stable >= 4 || attempts > 60) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
+                clearInterval(miniChatPollTimer); miniChatPollTimer = null;
+                var answer = lastText.replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
+                miniChatWindow.webContents.send('mini:reply', answer);
+              }
+              if (attempts > 90 && lastText.length === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
+                clearInterval(miniChatPollTimer); miniChatPollTimer = null;
+                miniChatWindow.webContents.send('mini:reply', '\u672a\u83b7\u53d6\u5230\u56de\u590d\uff0c\u8bf7\u68c0\u67e5\u4e3b\u7a97\u53e3');
+              }
+            }).catch(function(e){});
+          } catch(_) {}
+        }, 2000);
+      }).catch(function(e) {
+        console.log('[MiniChat] wcid error:', e.message);
+      });
     }
-    // 轮询回复，等到内容够长且稳定
-    if (miniChatPollTimer) { clearInterval(miniChatPollTimer); miniChatPollTimer = null; }
-    var lastText = '';
-    var stable = 0;
-    var attempts = 0;
-    miniChatPollTimer = setInterval(function() {
-      attempts++;
-      if (!mainWindow || mainWindow.isDestroyed() || !miniChatWindow || miniChatWindow.isDestroyed()) {
-        clearInterval(miniChatPollTimer); miniChatPollTimer = null; return;
-      }
-      try {
-        mainWindow.webContents.executeJavaScript(`
-          (async function(){
-            var chatView=document.getElementById('chatView');
-            if(!chatView)return"";
-                return await chatView.executeJavaScript(
-                  '(function(){var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
-                  'if(!roots.length)return"";var r=roots[roots.length-1].cloneNode(true);' +
-                  'var nodes=r.querySelectorAll(".dpp-tool-block,.dpp-agent-container");' +
-                  'for(var i=0;i<nodes.length;i++)nodes[i].remove();' +
-                  'return (r.textContent||"").trim();})()'
-                );
-          })()
-        `).then(function(text) {
-          if (text && text.length > 50 && text === lastText) {
-            stable++;
-          } else if (text && text.length > 50) {
-            lastText = text;
-            stable = 0;
-          }
-          // 每15次尝试更新状态
-          if (attempts % 15 === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
-            miniChatWindow.webContents.send('mini:reply', '...(' + attempts + ')');
-          }
-          // 稳定4次(8秒)或超过60次尝试(120秒)，返回结果
-          if ((stable >= 4 || attempts > 60) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
-            clearInterval(miniChatPollTimer); miniChatPollTimer = null;
-            var answer = lastText.replace(/温馨提示[：:][\\s\\S]*$/g,'').replace(/\\n{3,}/g,'\\n\\n').trim();
-            miniChatWindow.webContents.send('mini:reply', answer);
-          }
-          // 如果超过90次还没有任何结果，返回超时
-          if (attempts > 90 && lastText.length === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
-            clearInterval(miniChatPollTimer); miniChatPollTimer = null;
-            miniChatWindow.webContents.send('mini:reply', '未获取到回复，请检查主窗口');
-          }
-        }).catch(function(e){
-          console.log('[MiniChat] poll error:', e.message);
-        });
-      } catch(_) {}
-    }, 2000);
-    if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '查询中...');
+
   });
 
   ipcMain.on('mini:close', function() {
