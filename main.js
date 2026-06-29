@@ -3724,8 +3724,15 @@ function createMiniChat() {
         if (!path) return;
         imagePaths.push(path);
         var preview = document.getElementById('imgPreview');
+        var imgId = 'img_' + imagePaths.length;
         var displayUrl = dataUrl || ('file://' + path.replace(/\\\\/g,'/'));
-        preview.innerHTML += '<div style="display:flex;align-items:center;gap:4px"><img src="'+displayUrl.replace(/"/g,'&quot;')+'" onclick="this.parentElement.remove();var idx=imagePaths.indexOf(\''+path.replace(/'/g,"\\'").replace(/\\\\/g,'\\\\')+'\');if(idx>=0)imagePaths.splice(idx,1)" title="点击移除" style="width:48px;height:48px;border-radius:6px;object-fit:cover;cursor:pointer"><span style="font-size:10px;color:#6B8AFF">图片已附加，点击发送</span></div>';
+        preview.innerHTML += '<div class="img-preview-item" data-path="' + path.replace(/"/g,'&quot;') + '"><img id="'+imgId+'" src="'+displayUrl.replace(/"/g,'&quot;')+'" style="width:48px;height:48px;border-radius:6px;object-fit:cover;cursor:pointer"><span style="font-size:10px;color:#6B8AFF;margin-left:4px">图片已附加，点击发送</span></div>';
+        document.getElementById(imgId).addEventListener('click', function() {
+          var p = this.parentElement.getAttribute('data-path');
+          var idx = imagePaths.indexOf(p);
+          if (idx >= 0) imagePaths.splice(idx, 1);
+          this.parentElement.remove();
+        });
         document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
       });
       function ask() {
