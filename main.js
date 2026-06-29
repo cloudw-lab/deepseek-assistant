@@ -3614,6 +3614,8 @@ function createMiniChat() {
     .header-btns button.active { background:#4D6BFE; color:#fff; }
     .header-btns button:hover { background:rgba(255,255,255,.12); }
     .header-btns button.active:hover { background:#4D6BFE; }
+    #header { cursor: grab; }
+    #header:active { cursor: grabbing; }
     .msgs { flex:1; overflow-y:auto; padding:12px 14px; }
     .msg { margin:6px 0; padding:8px 12px; border-radius:12px; max-width:90%; word-break:break-word; }
     .msg.user { background:#4D6BFE; color:#fff; margin-left:auto; text-align:right; }
@@ -3628,7 +3630,7 @@ function createMiniChat() {
     .img-preview { display:flex; gap:4px; padding:4px 14px; flex-wrap:wrap; }
     .img-preview img { width:48px; height:48px; border-radius:6px; object-fit:cover; border:1px solid rgba(255,255,255,.1); }
   </style></head><body>
-     <div class="header">
+     <div class="header" id="header">
        <div class="header-btns">
          <button class="mode active" data-mode="default" id="modeDefault">默认</button>
          <button class="mode" data-mode="expert" id="modeExpert">专家</button>
@@ -3662,6 +3664,23 @@ function createMiniChat() {
         }
         var currentMode = 'default';
         var imagePaths = [];
+        // --- window drag ---
+        var dragStartX, dragStartY, isDragging = false;
+        document.getElementById('header').addEventListener('mousedown', function(e) {
+          if (e.target.tagName === 'BUTTON') return;
+          dragStartX = e.screenX; dragStartY = e.screenY; isDragging = false;
+        });
+        document.addEventListener('mousemove', function(e) {
+          if (dragStartX === undefined) return;
+          var dx = e.screenX - dragStartX, dy = e.screenY - dragStartY;
+          if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+            isDragging = true;
+            ipcRenderer.send('mini:move', dx, dy);
+            dragStartX = e.screenX; dragStartY = e.screenY;
+          }
+        });
+        document.addEventListener('mouseup', function() { dragStartX = undefined; });
+        // --- end drag ---
        function setMode(m, btn) {
          try {
            currentMode = m;
@@ -3737,6 +3756,7 @@ function createMiniChat() {
   ipcMain.removeAllListeners('mini:newchat');
   ipcMain.removeAllListeners('mini:pickImage');
   ipcMain.removeAllListeners('mini:pasteImage');
+  ipcMain.removeAllListeners('mini:move');
 
   ipcMain.on('mini:pickImage', function() {
     const { dialog } = require('electron');
@@ -3857,6 +3877,13 @@ function createMiniChat() {
 
   ipcMain.on('mini:close', function() {
     if (miniChatWindow) { miniChatWindow.close(); miniChatWindow = null; }
+  });
+
+  ipcMain.on('mini:move', function(_, dx, dy) {
+    if (miniChatWindow && !miniChatWindow.isDestroyed()) {
+      var pos = miniChatWindow.getPosition();
+      miniChatWindow.setPosition(Math.round(pos[0] + dx), Math.round(pos[1] + dy));
+    }
   });
 }
 
