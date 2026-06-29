@@ -3647,14 +3647,14 @@ function createMiniChat() {
      </div>
      <div class="img-preview" id="imgPreview"></div>
       <script>
-        console.log('[MiniChat] script starting...');
         window.onerror = function(msg, url, line) { 
           console.error('[MiniChat] ERROR:', msg, 'at', line);
-          document.body.innerText = 'ERR:'+msg+' at '+line; 
+          var msgs = document.getElementById('msgs');
+          if (msgs) msgs.innerHTML += '<div class="msg ai" style="color:red">Error: '+msg+' at line '+line+'</div>';
         };
+        var ipcRenderer;
         try {
-          const { ipcRenderer } = require('electron');
-          console.log('[MiniChat] ipcRenderer:', typeof ipcRenderer);
+          ipcRenderer = require('electron').ipcRenderer;
         } catch(e) {
           console.error('[MiniChat] require failed:', e.message);
           document.body.innerText = 'REQUIRE ERR: '+e.message;
@@ -3702,7 +3702,7 @@ function createMiniChat() {
         if (!path) return;
         imagePaths.push(path);
         var preview = document.getElementById('imgPreview');
-        preview.innerHTML += '<div style="display:flex;align-items:center;gap:4px"><img src="file://'+path.replace(/\\/g,'/')+'" onclick="this.parentElement.remove();imagePaths=imagePaths.filter(function(p){return p!=='+JSON.stringify(path)+'})" title="点击移除" style="width:48px;height:48px;border-radius:6px;object-fit:cover;cursor:pointer"><span style="font-size:10px;color:#a1a1aa">切换到主窗口粘贴此图片</span></div>';
+        preview.innerHTML += '<div style="display:flex;align-items:center;gap:4px"><img src="file://'+path.replace(/\\\\/g,'/')+'" onclick="this.parentElement.remove();imagePaths=imagePaths.filter(function(p){return p!=='+JSON.stringify(path)+'})" title="点击移除" style="width:48px;height:48px;border-radius:6px;object-fit:cover;cursor:pointer"><span style="font-size:10px;color:#a1a1aa">切换到主窗口粘贴此图片</span></div>';
       });
       function ask() {
         var q = document.getElementById('q').value.trim();
@@ -3723,10 +3723,6 @@ function createMiniChat() {
         document.getElementById('msgs').innerHTML += '<div class="msg ai">'+text.replace(/</g,'&lt;')+'</div>';
         document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
       });
-      console.log('[MiniChat] all event listeners attached, ready for clicks');
-      document.addEventListener('mousedown', function(e) {
-        console.log('[MiniChat] mousedown on', e.target.tagName, '#', e.target.id);
-      }, true);
     </script></body></html>`;
 
   miniChatWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
@@ -3734,7 +3730,6 @@ function createMiniChat() {
     miniChatWindow.show();
     miniChatWindow.focus();
   });
-  miniChatWindow.webContents.openDevTools({ mode: 'detach' });
   miniChatWindow.on('closed', function() { miniChatWindow = null; });
 
   ipcMain.removeAllListeners('mini:ask');
