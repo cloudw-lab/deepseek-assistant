@@ -3368,6 +3368,8 @@ app.whenReady().then(async () => {
 });
 
 let petWindow = null;
+let lastActiveTime = Date.now();
+let lastGreetingTime = 0;
 
 function createDesktopPet() {
   if (petWindow && !petWindow.isDestroyed()) return;
@@ -3401,6 +3403,7 @@ function createDesktopPet() {
       background:url(${logoB64}) no-repeat center/contain;
       animation: swim 8s ease-in-out infinite; }
     .pet[data-status="thinking"] { animation: swim 1.5s ease-in-out infinite; filter: brightness(1.1) drop-shadow(0 0 6px #4D6BFE); }
+    .pet[data-status="sleepy"] { animation: sleepy 4s ease-in-out infinite; filter: brightness(0.7) saturate(0.5); }
     .bubble { position:absolute; top:2px; left:50%; transform:translateX(-50%);
       background:rgba(255,255,255,.92); border-radius:10px; padding:3px 10px;
       font:bold 12px sans-serif; color:#333; white-space:nowrap; display:none;
@@ -3422,6 +3425,10 @@ function createDesktopPet() {
       90%     { transform:translateX(0) scaleX(1); }
       100%    { transform:translateX(0) scaleX(1); }
     }
+    @keyframes sleepy {
+      0%,100% { transform:translateY(0) scale(0.9); opacity:0.6; }
+      50%     { transform:translateY(2px) scale(0.9); opacity:0.5; }
+    }
   </style></head><body>
     <div class="pet" id="pet"></div>
     <div class="close-btn" id="closeBtn">✕</div>
@@ -3439,6 +3446,12 @@ function createDesktopPet() {
         pet.setAttribute('data-status', s);
       });
 
+      ipcRenderer.on('pet:bubble', function(_, msg) {
+        bubble.textContent = msg;
+        bubble.classList.add('show');
+        setTimeout(function(){ bubble.classList.remove('show'); }, 5000);
+      });
+
       document.getElementById('closeBtn').addEventListener('click', function(e) {
         e.stopPropagation();
         ipcRenderer.send('pet:close');
@@ -3449,6 +3462,7 @@ function createDesktopPet() {
         startY = e.screenY;
         startTime = Date.now();
         dragged = false;
+        ipcRenderer.send('pet:wakeup');
       });
 
       document.addEventListener('mousemove', function(e) {
@@ -3518,10 +3532,33 @@ function createDesktopPet() {
     `).then(function(result) {
       try {
         var state = JSON.parse(result);
+        var now = Date.now();
+
+        // 思考中 → 快游
         if (state.status === 'generating') {
           petWindow.webContents.send('pet:status', 'thinking');
+          lastActiveTime = now;
         } else {
           petWindow.webContents.send('pet:status', 'idle');
+        }
+
+        // 空闲超时 → 瞌睡
+        var idleSec = (now - lastActiveTime) / 1000;
+        if (idleSec > 300) {
+          petWindow.webContents.send('pet:status', 'sleepy');
+        }
+
+        // 时间段问候 (每30分钟一次)
+        if (now - lastGreetingTime > 1800000) {
+          var hour = new Date().getHours();
+          var greeting = '';
+          if (hour < 10) greeting = '早上好，今天有什么计划？';
+          else if (hour < 14) greeting = '中午好，需要帮你做什么？';
+          else if (hour < 18) greeting = '下午好，有什么需要？';
+          else if (hour < 22) greeting = '晚上好，需要总结今天吗？';
+          else greeting = '夜深了，还在工作吗？';
+          petWindow.webContents.send('pet:bubble', greeting);
+          lastGreetingTime = now;
         }
       } catch(_) {}
     }).catch(function(){});
@@ -3531,6 +3568,7 @@ function createDesktopPet() {
   ipcMain.removeAllListeners('pet:click');
   ipcMain.removeAllListeners('pet:dblclick');
   ipcMain.removeAllListeners('pet:close');
+  ipcMain.removeAllListeners('pet:wakeup');
 
   ipcMain.on('pet:move', function(_, dx, dy) {
     if (petWindow && !petWindow.isDestroyed()) {
@@ -3540,10 +3578,12 @@ function createDesktopPet() {
   });
 
   ipcMain.on('pet:click', function() {
+    lastActiveTime = Date.now();
     createMiniChat();
   });
 
   ipcMain.on('pet:dblclick', function() {
+    lastActiveTime = Date.now();
     if (mainWindow) {
       mainWindow.show();
       mainWindow.focus();
@@ -3559,6 +3599,10 @@ function createDesktopPet() {
       miniChatWindow.close();
       miniChatWindow = null;
     }
+  });
+
+  ipcMain.on('pet:wakeup', function() {
+    lastActiveTime = Date.now();
   });
 }
 
