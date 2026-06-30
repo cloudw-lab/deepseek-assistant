@@ -3944,7 +3944,21 @@ function createMiniChat() {
           }
           function clickSendWhenReady(retries) {
             var ta0=document.querySelector("textarea");
-            var candidates = document.querySelectorAll("button,[role=button]");
+            var candidates = [];
+            var scope = null;
+            if (ta0) {
+              var cur = ta0.parentElement;
+              for (var up = 0; cur && up < 6; up++) {
+                var scoped = cur.querySelectorAll ? cur.querySelectorAll("button,[role=button]") : [];
+                if (scoped && scoped.length >= 2) { scope = cur; break; }
+                cur = cur.parentElement;
+              }
+            }
+            if (scope) {
+              candidates = scope.querySelectorAll("button,[role=button]");
+            } else {
+              candidates = document.querySelectorAll("button,[role=button]");
+            }
             var sBtn=null;
             var bestScore = -Infinity;
             for(var i=0;i<candidates.length;i++){
@@ -3955,6 +3969,7 @@ function createMiniChat() {
               var cls=(b.className||"").toLowerCase();
               var aria=(b.getAttribute("aria-label")||"").toLowerCase();
               var txt=(b.textContent||"").trim().toLowerCase();
+              if(txt.indexOf("\u6df1\u5ea6\u601d\u8003")>=0 || txt.indexOf("\u667a\u80fd\u641c\u7d22")>=0 || txt.indexOf("\u5feb\u901f\u6a21\u5f0f")>=0 || txt.indexOf("\u4e13\u5bb6\u6a21\u5f0f")>=0 || txt.indexOf("\u8bc6\u56fe\u6a21\u5f0f")>=0) continue;
               var score = 0;
               if(cls.indexOf("send")>=0 || aria.indexOf("send")>=0 || aria.indexOf("\u53d1\u9001")>=0 || txt==="send" || txt==="\u53d1\u9001") score += 1000;
               if(b.querySelector && b.querySelector('svg')) score += 100;
@@ -3964,6 +3979,7 @@ function createMiniChat() {
                 if(rect.top >= taRect.top - 80 && rect.top <= taRect.bottom + 120) score += 200;
                 if(rect.left >= taRect.left) score += Math.max(0, rect.left - taRect.left) / 4;
                 if(rect.left > taRect.right - 30) score += 200;
+                if(rect.top >= taRect.top - 20 && rect.top <= taRect.bottom + 40) score += 100;
               }
               score += rect.top / 20;
               if(score > bestScore){ bestScore = score; sBtn = b; }
