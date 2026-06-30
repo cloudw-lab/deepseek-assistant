@@ -4131,8 +4131,8 @@ function createMiniChat() {
           + ')()';
         wc.executeJavaScript(code);
 
-        // Start polling if text was injected
-        if (!question) { return; }
+        // Start polling if text or images were sent
+        if (!question && images.length === 0) { return; }
         if (miniChatPollTimer) { clearInterval(miniChatPollTimer); miniChatPollTimer = null; }
         var lastText = '';
         var stable = 0;
