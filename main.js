@@ -3862,30 +3862,36 @@ function createMiniChat() {
           var M='PLACEHOLDER_M';
           var IMG_COUNT = 0;
           var IMG_DATA = [];  // [{b64,mime},...]
-          // Switch mode - find leaf with target text, click with full MouseEvent
+          // Switch mode - try multiple text patterns
           var modeMap={"default":"\u9ed8\u8ba4","DEFAULT":"\u9ed8\u8ba4","expert":"\u4e13\u5bb6","EXPERT":"\u4e13\u5bb6","vision":"\u8bc6\u56fe","VISION":"\u8bc6\u56fe"};
           var target=modeMap[M]||"\u9ed8\u8ba4";
-          if (target !== "\u9ed8\u8ba4") {
+          // Extended patterns for DeepSeek page
+          var patterns = [];
+          if (target === "\u8bc6\u56fe") patterns = ["\u8bc6\u56fe", "vision", "V3", "DeepSeek-V3", "\u56fe\u7247\u7406\u89e3", "\u89c6\u89c9"];
+          else if (target === "\u4e13\u5bb6") patterns = ["\u4e13\u5bb6", "expert", "R1", "DeepSeek-R1", "\u6df1\u5ea6\u601d\u8003"];
+          else if (target !== "\u9ed8\u8ba4") patterns = [target];
+          var found = false;
+          for (var p=0; p<patterns.length && !found; p++) {
+            var t = patterns[p];
             var all = document.querySelectorAll('*');
             for (var i=all.length-1; i>=0; i--) {
               var el = all[i];
               var txt = (el.textContent || '').trim();
-              if (txt === target && el.children.length === 0) {
-                // Walk up to clickable ancestor
-                var clickable = el;
-                while (clickable && clickable.tagName !== 'BUTTON' && clickable.tagName !== 'A' && clickable.getAttribute('role') !== 'tab' && clickable.getAttribute('role') !== 'button') {
-                  clickable = clickable.parentElement;
+              if ((txt === t || txt.indexOf(t) >= 0) && el.children.length === 0) {
+                while (el && el.tagName !== 'BUTTON' && el.tagName !== 'A' && el.getAttribute('role') !== 'tab' && el.getAttribute('role') !== 'button') {
+                  el = el.parentElement;
+                  if (!el) break;
                 }
-                if (clickable && clickable.tagName) {
-                  var r = clickable.getBoundingClientRect();
+                if (el && el.tagName) {
+                  var r = el.getBoundingClientRect();
                   ['mousedown','mouseup','click'].forEach(function(type){
-                    clickable.dispatchEvent(new MouseEvent(type,{
+                    el.dispatchEvent(new MouseEvent(type,{
                       bubbles:true,cancelable:true,view:window,
                       clientX:r.left+r.width/2,clientY:r.top+r.height/2,
-                      screenX:r.left+r.width/2,screenY:r.top+r.height/2,
                       button:0,buttons:1
                     }));
                   });
+                  found = true;
                   break;
                 }
               }
