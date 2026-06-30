@@ -3886,19 +3886,34 @@ function createMiniChat() {
           }
           function findTopModeClickable(t) {
             var all = document.querySelectorAll('*');
-            var best = null;
-            var bestTop = Infinity;
+            var group = null;
+            var groupTop = Infinity;
             for (var i=0; i<all.length; i++) {
               var el = all[i];
               var txt = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
-              if (!(txt === t || txt.indexOf(t) >= 0)) continue;
+              if (txt.indexOf('\u5feb\u901f\u6a21\u5f0f') < 0 || txt.indexOf('\u4e13\u5bb6\u6a21\u5f0f') < 0 || txt.indexOf('\u8bc6\u56fe\u6a21\u5f0f') < 0) continue;
               var rect = el.getBoundingClientRect();
-              if (!rect || rect.width <= 0 || rect.height <= 0) continue;
+              if (!rect || rect.width <= 200 || rect.height <= 30) continue;
               if (rect.top < 0 || rect.top > Math.min(window.innerHeight * 0.65, 700)) continue;
-              if (rect.width < 40 || rect.height < 20) continue;
-              if (rect.top < bestTop) {
-                bestTop = rect.top;
-                best = el;
+              if (rect.top < groupTop) {
+                groupTop = rect.top;
+                group = el;
+              }
+            }
+            var scope = group || document;
+            var best = null;
+            var bestTop = Infinity;
+            var candidates = scope.querySelectorAll('*');
+            for (var j=0; j<candidates.length; j++) {
+              var node = candidates[j];
+              var nodeTxt = (node.innerText || node.textContent || '').trim().replace(/\s+/g, ' ');
+              if (!(nodeTxt === t || nodeTxt.indexOf(t) >= 0)) continue;
+              var nodeRect = node.getBoundingClientRect();
+              if (!nodeRect || nodeRect.width <= 0 || nodeRect.height <= 0) continue;
+              if (nodeRect.top < 0 || nodeRect.top > Math.min(window.innerHeight * 0.65, 700)) continue;
+              if (nodeRect.top < bestTop) {
+                bestTop = nodeRect.top;
+                best = node;
               }
             }
             if (!best) return null;
