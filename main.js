@@ -3862,10 +3862,9 @@ function createMiniChat() {
           var M='PLACEHOLDER_M';
           var IMG_COUNT = 0;
           var IMG_DATA = [];  // [{b64,mime},...]
-          // Switch mode - try multiple text patterns
+          // Switch mode - known good version
           var modeMap={"default":"\u5feb\u901f\u6a21\u5f0f","DEFAULT":"\u5feb\u901f\u6a21\u5f0f","expert":"\u4e13\u5bb6\u6a21\u5f0f","EXPERT":"\u4e13\u5bb6\u6a21\u5f0f","vision":"\u8bc6\u56fe\u6a21\u5f0f","VISION":"\u8bc6\u56fe\u6a21\u5f0f"};
           var target=modeMap[M]||"\u5feb\u901f\u6a21\u5f0f";
-          // Extended patterns for DeepSeek page
           var patterns = [];
           if (target === "\u8bc6\u56fe\u6a21\u5f0f") patterns = ["\u8bc6\u56fe\u6a21\u5f0f", "\u8bc6\u56fe", "vision", "V3", "DeepSeek-V3", "\u56fe\u7247\u7406\u89e3", "\u89c6\u89c9"];
           else if (target === "\u4e13\u5bb6\u6a21\u5f0f") patterns = ["\u4e13\u5bb6\u6a21\u5f0f", "\u4e13\u5bb6", "expert", "R1", "DeepSeek-R1", "\u6df1\u5ea6\u601d\u8003"];
@@ -3877,43 +3876,21 @@ function createMiniChat() {
             var state = el.getAttribute('data-state');
             return aria === 'true' || state === 'active' || cls.indexOf('active') >= 0 || cls.indexOf('selected') >= 0 || cls.indexOf('current') >= 0;
           }
-          function modeReady() {
-            if (target === "\u5feb\u901f\u6a21\u5f0f") return true;
-            var pageText = (document.body && document.body.innerText || '');
-            if (pageText.indexOf('\u4f7f\u7528' + target + '\u5f00\u59cb\u5bf9\u8bdd') >= 0) return true;
-            if (chosenModeEl && isSelected(chosenModeEl)) return true;
-            return false;
-          }
           function findTopModeClickable(t) {
             var all = document.querySelectorAll('*');
-            var group = null;
-            var groupTop = Infinity;
-            for (var i=0; i<all.length; i++) {
-              var el = all[i];
-              var txt = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
-              if (txt.indexOf('\u5feb\u901f\u6a21\u5f0f') < 0 || txt.indexOf('\u4e13\u5bb6\u6a21\u5f0f') < 0 || txt.indexOf('\u8bc6\u56fe\u6a21\u5f0f') < 0) continue;
-              var rect = el.getBoundingClientRect();
-              if (!rect || rect.width <= 200 || rect.height <= 30) continue;
-              if (rect.top < 0 || rect.top > Math.min(window.innerHeight * 0.65, 700)) continue;
-              if (rect.top < groupTop) {
-                groupTop = rect.top;
-                group = el;
-              }
-            }
-            var scope = group || document;
             var best = null;
             var bestTop = Infinity;
-            var candidates = scope.querySelectorAll('*');
-            for (var j=0; j<candidates.length; j++) {
-              var node = candidates[j];
-              var nodeTxt = (node.innerText || node.textContent || '').trim().replace(/\s+/g, ' ');
-              if (!(nodeTxt === t || nodeTxt.indexOf(t) >= 0)) continue;
-              var nodeRect = node.getBoundingClientRect();
-              if (!nodeRect || nodeRect.width <= 0 || nodeRect.height <= 0) continue;
-              if (nodeRect.top < 0 || nodeRect.top > Math.min(window.innerHeight * 0.65, 700)) continue;
-              if (nodeRect.top < bestTop) {
-                bestTop = nodeRect.top;
-                best = node;
+            for (var i=0; i<all.length; i++) {
+              var el = all[i];
+              var txt = (el.textContent || '').trim();
+              if (el.children.length > 0) continue;
+              if (!(txt === t || txt.indexOf(t) >= 0)) continue;
+              var rect = el.getBoundingClientRect();
+              if (!rect || rect.width <= 0 || rect.height <= 0) continue;
+              if (rect.top < 0 || rect.top > Math.min(window.innerHeight * 0.65, 700)) continue;
+              if (rect.top < bestTop) {
+                bestTop = rect.top;
+                best = el;
               }
             }
             if (!best) return null;
@@ -3928,21 +3905,13 @@ function createMiniChat() {
           for (var p=0; p<patterns.length && !found; p++) {
             chosenModeEl = findTopModeClickable(patterns[p]);
             if (chosenModeEl) {
-              var chain = [];
-              var cur = chosenModeEl;
-              for (var k = 0; cur && k < 5; k++) {
-                chain.push(cur);
-                cur = cur.parentElement;
-              }
-              chain.forEach(function(node){
-                var r = node.getBoundingClientRect();
-                ['mousedown','mouseup','click'].forEach(function(type){
-                  node.dispatchEvent(new MouseEvent(type,{
-                    bubbles:true,cancelable:true,view:window,
-                    clientX:r.left+r.width/2,clientY:r.top+r.height/2,
-                    button:0,buttons:1
-                  }));
-                });
+              var r = chosenModeEl.getBoundingClientRect();
+              ['mousedown','mouseup','click'].forEach(function(type){
+                chosenModeEl.dispatchEvent(new MouseEvent(type,{
+                  bubbles:true,cancelable:true,view:window,
+                  clientX:r.left+r.width/2,clientY:r.top+r.height/2,
+                  button:0,buttons:1
+                }));
               });
               found = true;
             }
@@ -3967,30 +3936,6 @@ function createMiniChat() {
               ta.dispatchEvent(ev);
             } catch(e) {}
             setTimeout(function(){ pasteImage(idx+1); }, 600);
-          }
-          function clickVisionHintIfPresent() {
-            if (M !== 'vision' && M !== 'VISION') return;
-            var all = document.querySelectorAll('a, button, [role="button"], [role="link"], span, div');
-            for (var i = 0; i < all.length; i++) {
-              var el = all[i];
-              var txt = (el.innerText || el.textContent || '').trim();
-              if (txt.indexOf('\u8bc6\u56fe\u6a21\u5f0f') >= 0) {
-                var r = el.getBoundingClientRect();
-                if (!r || r.width <= 0 || r.height <= 0) continue;
-                ['mousedown','mouseup','click'].forEach(function(type){
-                  el.dispatchEvent(new MouseEvent(type, {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window,
-                    clientX: r.left + r.width / 2,
-                    clientY: r.top + r.height / 2,
-                    button: 0,
-                    buttons: 1
-                  }));
-                });
-                break;
-              }
-            }
           }
           function clickSendWhenReady(retries) {
             var btns=document.querySelectorAll("button");var sBtn=null;
@@ -4018,7 +3963,6 @@ function createMiniChat() {
               ta.dispatchEvent(new Event("change",{bubbles:true}));
               ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             }
-            clickVisionHintIfPresent();
             clickSendWhenReady(20);
           }
           // Wait until the selected state is visible before pasting
