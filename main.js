@@ -4045,7 +4045,6 @@ function createMiniChat() {
           function typeAndSend() {
             var ta=document.querySelector("textarea");
             if (Q && ta) {
-              console.log('[MiniChatInject] typing text len=', Q.length);
               var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;
               ns.call(ta,"");ns.call(ta,Q);ta.focus();
               ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:Q}));
@@ -4053,7 +4052,17 @@ function createMiniChat() {
               ta.dispatchEvent(new Event("change",{bubbles:true}));
               ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             }
-            clickSendWhenReady(120);
+            // For image-only: try Enter on active element / document first, then fallback to button
+            if (!Q && IMG_COUNT > 0) {
+              var target = document.activeElement || document.body;
+              target.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
+              target.dispatchEvent(new KeyboardEvent("keyup",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
+              // Also try pressing Enter on document.body to trigger global handler
+              setTimeout(function(){
+                document.body.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
+              }, 200);
+            }
+            if (Q || IMG_COUNT > 0) clickSendWhenReady(120);
           }
           // Wait until the selected state is visible before pasting
           function waitForModeAndPaste(retries) {
