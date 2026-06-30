@@ -3863,7 +3863,7 @@ function createMiniChat() {
                 if(!fi){fi=document.createElement('input');fi.type='file';fi.style.display='none';document.body.appendChild(fi);}
                 Object.defineProperty(fi,'files',{value:dt.files});
                 fi.dispatchEvent(new Event('change',{bubbles:true}));
-              }).toString().replace('PLACEHOLDER_B64', JSON.stringify(b64)).replace('PLACEHOLDER_MIME', JSON.stringify(mime)) + ')()';
+              }).toString().replace("'PLACEHOLDER_B64'", JSON.stringify(b64)).replace("'PLACEHOLDER_MIME'", JSON.stringify(mime)) + ')()';
               setTimeout(function() { wc.executeJavaScript(code); }, idx * 600);
               console.log('[MiniChat] queued image ' + idx + ' (' + (b64.length/1024).toFixed(0) + 'KB)');
             } catch(e) { console.log('[MiniChat] image err:', e.message); }
@@ -3899,7 +3899,7 @@ function createMiniChat() {
               ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             },300);
           }).toString() + ')()';
-          code = code.replace('PLACEHOLDER_Q', JSON.stringify(question)).replace('PLACEHOLDER_M', JSON.stringify(mode));
+          code = code.replace("'PLACEHOLDER_Q'", JSON.stringify(question)).replace("'PLACEHOLDER_M'", JSON.stringify(mode));
           wc.executeJavaScript(code);
         }
 
