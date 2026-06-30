@@ -3863,13 +3863,13 @@ function createMiniChat() {
           var IMG_COUNT = 0;
           var IMG_DATA = [];  // [{b64,mime},...]
           // Switch mode - try multiple text patterns
-          var modeMap={"default":"\u9ed8\u8ba4","DEFAULT":"\u9ed8\u8ba4","expert":"\u4e13\u5bb6","EXPERT":"\u4e13\u5bb6","vision":"\u8bc6\u56fe","VISION":"\u8bc6\u56fe"};
-          var target=modeMap[M]||"\u9ed8\u8ba4";
+          var modeMap={"default":"\u5feb\u901f\u6a21\u5f0f","DEFAULT":"\u5feb\u901f\u6a21\u5f0f","expert":"\u4e13\u5bb6\u6a21\u5f0f","EXPERT":"\u4e13\u5bb6\u6a21\u5f0f","vision":"\u8bc6\u56fe\u6a21\u5f0f","VISION":"\u8bc6\u56fe\u6a21\u5f0f"};
+          var target=modeMap[M]||"\u5feb\u901f\u6a21\u5f0f";
           // Extended patterns for DeepSeek page
           var patterns = [];
-          if (target === "\u8bc6\u56fe") patterns = ["\u8bc6\u56fe", "vision", "V3", "DeepSeek-V3", "\u56fe\u7247\u7406\u89e3", "\u89c6\u89c9"];
-          else if (target === "\u4e13\u5bb6") patterns = ["\u4e13\u5bb6", "expert", "R1", "DeepSeek-R1", "\u6df1\u5ea6\u601d\u8003"];
-          else if (target !== "\u9ed8\u8ba4") patterns = [target];
+          if (target === "\u8bc6\u56fe\u6a21\u5f0f") patterns = ["\u8bc6\u56fe\u6a21\u5f0f", "\u8bc6\u56fe", "vision", "V3", "DeepSeek-V3", "\u56fe\u7247\u7406\u89e3", "\u89c6\u89c9"];
+          else if (target === "\u4e13\u5bb6\u6a21\u5f0f") patterns = ["\u4e13\u5bb6\u6a21\u5f0f", "\u4e13\u5bb6", "expert", "R1", "DeepSeek-R1", "\u6df1\u5ea6\u601d\u8003"];
+          else patterns = ["\u5feb\u901f\u6a21\u5f0f", "\u5feb\u901f", "default"];
           function isSelected(el) {
             if (!el) return false;
             var cls = ((el.className || '') + ' ' + (el.parentElement && el.parentElement.className || '')).toLowerCase();
@@ -3885,7 +3885,7 @@ function createMiniChat() {
               var el = all[i];
               var txt = (el.textContent || '').trim();
               if (el.children.length > 0) continue;
-              if (txt !== t) continue;
+              if (!(txt === t || txt.indexOf(t) >= 0)) continue;
               var rect = el.getBoundingClientRect();
               if (!rect || rect.width <= 0 || rect.height <= 0) continue;
               if (rect.top < 0 || rect.top > Math.min(window.innerHeight * 0.65, 700)) continue;
