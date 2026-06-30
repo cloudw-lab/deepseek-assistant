@@ -3968,6 +3968,30 @@ function createMiniChat() {
             } catch(e) {}
             setTimeout(function(){ pasteImage(idx+1); }, 600);
           }
+          function clickVisionHintIfPresent() {
+            if (M !== 'vision' && M !== 'VISION') return;
+            var all = document.querySelectorAll('a, button, [role="button"], [role="link"], span, div');
+            for (var i = 0; i < all.length; i++) {
+              var el = all[i];
+              var txt = (el.innerText || el.textContent || '').trim();
+              if (txt.indexOf('\u8bc6\u56fe\u6a21\u5f0f') >= 0) {
+                var r = el.getBoundingClientRect();
+                if (!r || r.width <= 0 || r.height <= 0) continue;
+                ['mousedown','mouseup','click'].forEach(function(type){
+                  el.dispatchEvent(new MouseEvent(type, {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: r.left + r.width / 2,
+                    clientY: r.top + r.height / 2,
+                    button: 0,
+                    buttons: 1
+                  }));
+                });
+                break;
+              }
+            }
+          }
           function clickSendWhenReady(retries) {
             var btns=document.querySelectorAll("button");var sBtn=null;
             for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("\u53d1\u9001")>=0||txt==="send"||txt==="\u53d1\u9001"){sBtn=b;break;}}
@@ -3994,6 +4018,7 @@ function createMiniChat() {
               ta.dispatchEvent(new Event("change",{bubbles:true}));
               ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             }
+            clickVisionHintIfPresent();
             clickSendWhenReady(20);
           }
           // Wait until the selected state is visible before pasting
