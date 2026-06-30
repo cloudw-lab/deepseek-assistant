@@ -3862,15 +3862,25 @@ function createMiniChat() {
           var M='PLACEHOLDER_M';
           var IMG_COUNT = 0;
           var IMG_DATA = [];  // [{b64,mime},...]
-          // Switch mode
-          var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");
+          // Switch mode - find any clickable element with target text
           var modeMap={"default":"\u9ed8\u8ba4","DEFAULT":"\u9ed8\u8ba4","expert":"\u4e13\u5bb6","EXPERT":"\u4e13\u5bb6","vision":"\u8bc6\u56fe","VISION":"\u8bc6\u56fe"};
           var target=modeMap[M]||"\u9ed8\u8ba4";
-          for(var i=0;i<modeBtns.length;i++){if((modeBtns[i].textContent||"").trim().indexOf(target)>=0){modeBtns[i].click();break;}}
+          var all=document.querySelectorAll("button, [role=tab], [role=button], div[class*=mode]");
+          for(var i=0;i<all.length;i++){
+            var el=all[i];
+            if(el.offsetParent && (el.textContent||"").indexOf(target)>=0){
+              el.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));
+              el.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));
+              el.click();
+              break;
+            }
+          }
           // Paste images after mode switch settles
           function pasteImage(idx) {
             if (idx >= IMG_COUNT) { typeAndSend(); return; }
             var d = IMG_DATA[idx];
+            var ta = document.querySelector('textarea');
+            if (!ta) { setTimeout(function(){ pasteImage(idx); }, 300); return; }
             try {
               var raw=atob(d.b64);
               var bytes=new Uint8Array(raw.length);
@@ -3879,13 +3889,10 @@ function createMiniChat() {
               var file=new File([blob],'image.'+(d.mime.split('/')[1]||'png'),{type:d.mime});
               var dt=new DataTransfer();
               dt.items.add(file);
-              var ta=document.querySelector('textarea');
-              if(ta){
-                ta.focus();
-                var ev=new ClipboardEvent('paste',{bubbles:true,cancelable:true});
-                Object.defineProperty(ev,'clipboardData',{value:dt});
-                ta.dispatchEvent(ev);
-              }
+              ta.focus();
+              var ev=new ClipboardEvent('paste',{bubbles:true,cancelable:true});
+              Object.defineProperty(ev,'clipboardData',{value:dt});
+              ta.dispatchEvent(ev);
             } catch(e) {}
             setTimeout(function(){ pasteImage(idx+1); }, 600);
           }
@@ -3904,7 +3911,7 @@ function createMiniChat() {
               ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             }
           }
-          setTimeout(function(){ pasteImage(0); }, 500);
+          setTimeout(function(){ pasteImage(0); }, 1000);
         }).toString()
           .replace("'PLACEHOLDER_Q'", JSON.stringify(question || ''))
           .replace("'PLACEHOLDER_M'", JSON.stringify(mode))
