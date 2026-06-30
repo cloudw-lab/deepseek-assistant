@@ -3848,17 +3848,7 @@ function createMiniChat() {
           if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '主窗口未就绪');
           return;
         }
-        if (modeChanged) {
-          console.log('[MiniChat] mode changed ' + prevMode + ' -> ' + mode + ', starting new conversation');
-          wc.executeJavaScript(
-            '(function(){' +
-            'var btn=document.querySelector("[aria-label=\\"New chat\\"], [aria-label=\\"新对话\\"]");' +
-            'if(!btn){var as=document.querySelectorAll("a");for(var i=0;i<as.length;i++){if(as[i].href&&as[i].href.indexOf("/chat")>=0&&!as[i].href.includes("/s/")){btn=as[i];break;}}}' +
-            'if(btn)btn.click();' +
-            'else{window.location.href="https://chat.deepseek.com/";}' +
-            '})()'
-          ).catch(function(e){ console.log('[MiniChat] new chat click failed:', e.message); });
-        }
+        function continueInject() {
         console.log('[MiniChat] wcid=' + wcid + ' injecting question');
 
         // Build a single combined script
@@ -4192,9 +4182,25 @@ function createMiniChat() {
             }).catch(function(e){});
           } catch(_) {}
         }, 2000);
-        }).catch(function(e) {
-          console.log('[MiniChat] wcid error:', e.message);
-        });
+        }
+        if (modeChanged) {
+          console.log('[MiniChat] mode changed ' + prevMode + ' -> ' + mode + ', starting new conversation');
+          wc.executeJavaScript(
+            '(function(){' +
+            'var btn=document.querySelector("[aria-label=\\"New chat\\"], [aria-label=\\"新对话\\"]");' +
+            'if(!btn){var as=document.querySelectorAll("a");for(var i=0;i<as.length;i++){if(as[i].href&&as[i].href.indexOf("/chat")>=0&&!as[i].href.includes("/s/")){btn=as[i];break;}}}' +
+            'if(btn)btn.click();' +
+            'else{window.location.href="https://chat.deepseek.com/";}' +
+            '})()'
+          ).catch(function(e){ console.log('[MiniChat] new chat click failed:', e.message); }).finally(function(){
+            setTimeout(continueInject, 1200);
+          });
+        } else {
+          continueInject();
+        }
+      }).catch(function(e) {
+        console.log('[MiniChat] wcid error:', e.message);
+      });
       }, modeChanged ? 1200 : 0);
     }
 
