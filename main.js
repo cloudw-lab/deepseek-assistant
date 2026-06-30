@@ -3841,72 +3841,80 @@ function createMiniChat() {
         }
         console.log('[MiniChat] wcid=' + wcid + ' injecting question');
 
-        // Auto-paste images via atob+Blob+File into webview file input
+        // Build a single combined script
+        var fs = require('fs');
+        var imageScripts = [];
         if (images.length > 0) {
           var fs = require('fs');
-          images.forEach(function(imgPath, idx) {
+          images.forEach(function(imgPath) {
             try {
               var ext = require('path').extname(imgPath).toLowerCase();
               var mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
               var b64 = fs.readFileSync(imgPath).toString('base64');
-              var code = '(' + (function(){
-                var B64='PLACEHOLDER_B64';
-                var MIME='PLACEHOLDER_MIME';
-                var raw=atob(B64);
-                var bytes=new Uint8Array(raw.length);
-                for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
-                var blob=new Blob([bytes],{type:MIME});
-                var file=new File([blob],'image.'+(MIME.split('/')[1]||'png'),{type:MIME});
-                var dt=new DataTransfer();
-                dt.items.add(file);
-                var ta=document.querySelector('textarea');
-                if(ta){
-                  ta.focus();
-                  var ev=new ClipboardEvent('paste',{bubbles:true,cancelable:true});
-                  Object.defineProperty(ev,'clipboardData',{value:dt});
-                  ta.dispatchEvent(ev);
-                }
-              }).toString().replace("'PLACEHOLDER_B64'", JSON.stringify(b64)).replace("'PLACEHOLDER_MIME'", JSON.stringify(mime)) + ')()';
-              setTimeout(function() { wc.executeJavaScript(code); }, idx * 600);
-              console.log('[MiniChat] queued image ' + idx + ' (' + (b64.length/1024).toFixed(0) + 'KB)');
-            } catch(e) { console.log('[MiniChat] image err:', e.message); }
+              imageScripts.push({b64: b64, mime: mime});
+            } catch(e) {}
           });
         }
 
-        // Inject text question
-        if (question) {
-          injectAndPoll();
-        } else if (images.length === 0) {
-          return;
-        }
-
-        function injectAndPoll() {
-          var code = '(' + (function(){
-            var q='PLACEHOLDER_Q';
-            var m='PLACEHOLDER_M';
-            var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");
-            var modeMap={"default":"\u9ed8\u8ba4","DEFAULT":"\u9ed8\u8ba4","expert":"\u4e13\u5bb6","EXPERT":"\u4e13\u5bb6","vision":"\u8bc6\u56fe","VISION":"\u8bc6\u56fe"};
-            var target=modeMap[m]||"\u9ed8\u8ba4";
-            for(var i=0;i<modeBtns.length;i++){if((modeBtns[i].textContent||"").trim().indexOf(target)>=0){modeBtns[i].click();break;}}
-            setTimeout(function(){
-              var ta=document.querySelector("textarea");if(!ta)return;
+        // Build injected code: mode switch → paste images → type text → send
+        var code = '(' + (function(){
+          var Q='PLACEHOLDER_Q';
+          var M='PLACEHOLDER_M';
+          var IMG_COUNT = 0;
+          var IMG_DATA = [];  // [{b64,mime},...]
+          // Switch mode
+          var modeBtns=document.querySelectorAll("[class*=mode] button, [role=tab]");
+          var modeMap={"default":"\u9ed8\u8ba4","DEFAULT":"\u9ed8\u8ba4","expert":"\u4e13\u5bb6","EXPERT":"\u4e13\u5bb6","vision":"\u8bc6\u56fe","VISION":"\u8bc6\u56fe"};
+          var target=modeMap[M]||"\u9ed8\u8ba4";
+          for(var i=0;i<modeBtns.length;i++){if((modeBtns[i].textContent||"").trim().indexOf(target)>=0){modeBtns[i].click();break;}}
+          // Paste images after mode switch settles
+          function pasteImage(idx) {
+            if (idx >= IMG_COUNT) { typeAndSend(); return; }
+            var d = IMG_DATA[idx];
+            try {
+              var raw=atob(d.b64);
+              var bytes=new Uint8Array(raw.length);
+              for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+              var blob=new Blob([bytes],{type:d.mime});
+              var file=new File([blob],'image.'+(d.mime.split('/')[1]||'png'),{type:d.mime});
+              var dt=new DataTransfer();
+              dt.items.add(file);
+              var ta=document.querySelector('textarea');
+              if(ta){
+                ta.focus();
+                var ev=new ClipboardEvent('paste',{bubbles:true,cancelable:true});
+                Object.defineProperty(ev,'clipboardData',{value:dt});
+                ta.dispatchEvent(ev);
+              }
+            } catch(e) {}
+            setTimeout(function(){ pasteImage(idx+1); }, 600);
+          }
+          function typeAndSend() {
+            var ta=document.querySelector("textarea");if(!ta)return;
+            if (Q) {
               var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;
-              ns.call(ta,"");ns.call(ta,q);ta.focus();
-              ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:q}));
-              ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:q}));
+              ns.call(ta,"");ns.call(ta,Q);ta.focus();
+              ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:Q}));
+              ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:Q}));
               ta.dispatchEvent(new Event("change",{bubbles:true}));
               var btns=document.querySelectorAll("button");var sBtn=null;
               for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("\u53d1\u9001")>=0||txt==="send"||txt==="\u53d1\u9001"){sBtn=b;break;}}
               if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}
               if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}
               ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
-            },300);
-          }).toString() + ')()';
-          code = code.replace("'PLACEHOLDER_Q'", JSON.stringify(question)).replace("'PLACEHOLDER_M'", JSON.stringify(mode));
-          wc.executeJavaScript(code);
-        }
+            }
+          }
+          setTimeout(function(){ pasteImage(0); }, 500);
+        }).toString()
+          .replace("'PLACEHOLDER_Q'", JSON.stringify(question || ''))
+          .replace("'PLACEHOLDER_M'", JSON.stringify(mode))
+          .replace('IMG_COUNT = 0', 'IMG_COUNT = ' + imageScripts.length)
+          .replace('IMG_DATA = []', 'IMG_DATA = ' + JSON.stringify(imageScripts))
+          + ')()';
+        wc.executeJavaScript(code);
 
-        // Start polling via the same webContents
+        // Start polling if text was injected
+        if (!question) { return; }
         if (miniChatPollTimer) { clearInterval(miniChatPollTimer); miniChatPollTimer = null; }
         var lastText = '';
         var stable = 0;
