@@ -3877,18 +3877,11 @@ function createMiniChat() {
             return aria === 'true' || state === 'active' || cls.indexOf('active') >= 0 || cls.indexOf('selected') >= 0 || cls.indexOf('current') >= 0;
           }
           function modeReady() {
-            if (target === "\u5feb\u901f\u6a21\u5f0f") return true;
-            var currentBtn = findTopModeClickable(target);
-            if (currentBtn && isSelected(currentBtn)) return true;
-            if (target !== "\u5feb\u901f\u6a21\u5f0f") {
-              var all = document.querySelectorAll('*');
-              for (var i=0; i<all.length; i++) {
-                var el = all[i];
-                if (el.children.length > 0) continue;
-                var txt = (el.textContent || '').trim();
-                if (txt.indexOf(target) >= 0 && isSelected(el)) return true;
-              }
-            }
+            try {
+              if (target === "\u5feb\u901f\u6a21\u5f0f") return true;
+              var currentBtn = findTopModeClickable(target);
+              if (currentBtn && isSelected(currentBtn)) return true;
+            } catch(e) {}
             return false;
           }
           function findTopModeClickable(t) {
