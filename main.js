@@ -3944,6 +3944,25 @@ function createMiniChat() {
           }
           function clickSendWhenReady(retries) {
             var ta0=document.querySelector("textarea");
+            if(ta0){
+              var form = ta0.closest ? ta0.closest('form') : null;
+              if(form){
+                try {
+                  if(typeof form.requestSubmit === 'function'){
+                    form.requestSubmit();
+                    return;
+                  }
+                } catch(_) {}
+                try {
+                  var submitEv = new Event('submit', {bubbles:true, cancelable:true});
+                  form.dispatchEvent(submitEv);
+                  if(!submitEv.defaultPrevented && typeof form.submit === 'function'){
+                    form.submit();
+                  }
+                  return;
+                } catch(_) {}
+              }
+            }
             var candidates = [];
             var scope = null;
             if (ta0) {
