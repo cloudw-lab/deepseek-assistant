@@ -4149,7 +4149,6 @@ function createMiniChat() {
         var lastText = '';
         var stable = 0;
         var attempts = 0;
-        if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '\u67e5\u8be2\u4e2d...');
         miniChatPollTimer = setInterval(function() {
           attempts++;
           if (!mainWindow || mainWindow.isDestroyed() || !miniChatWindow || miniChatWindow.isDestroyed()) {
@@ -4172,9 +4171,6 @@ function createMiniChat() {
               } else if (text && text.length > 50) {
                 lastText = text;
                 stable = 0;
-              }
-              if (attempts % 15 === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
-                miniChatWindow.webContents.send('mini:reply', '...(' + attempts + ')');
               }
               if ((stable >= 4 || attempts > 60) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
                 clearInterval(miniChatPollTimer); miniChatPollTimer = null;
