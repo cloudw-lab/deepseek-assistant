@@ -3938,9 +3938,25 @@ function createMiniChat() {
             } catch(e) {}
             setTimeout(function(){ pasteImage(idx+1); }, 600);
           }
+          function clickSendWhenReady(retries) {
+            var btns=document.querySelectorAll("button");var sBtn=null;
+            for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("\u53d1\u9001")>=0||txt==="send"||txt==="\u53d1\u9001"){sBtn=b;break;}}
+            if(!sBtn){
+              var ta0=document.querySelector("textarea");
+              var pbtns=ta0&&ta0.parentElement?ta0.parentElement.querySelectorAll("button"):[];
+              for(var j=pbtns.length-1;j>=0;j--){if(pbtns[j].offsetParent){sBtn=pbtns[j];break;}}
+            }
+            if(sBtn && !sBtn.disabled){
+              sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));
+              sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));
+              sBtn.click();
+              return;
+            }
+            if(retries > 0) setTimeout(function(){ clickSendWhenReady(retries - 1); }, 400);
+          }
           function typeAndSend() {
-            var ta=document.querySelector("textarea");if(!ta)return;
-            if (Q) {
+            var ta=document.querySelector("textarea");
+            if (Q && ta) {
               var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;
               ns.call(ta,"");ns.call(ta,Q);ta.focus();
               ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:Q}));
@@ -3948,10 +3964,7 @@ function createMiniChat() {
               ta.dispatchEvent(new Event("change",{bubbles:true}));
               ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             }
-            var btns=document.querySelectorAll("button");var sBtn=null;
-            for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("\u53d1\u9001")>=0||txt==="send"||txt==="\u53d1\u9001"){sBtn=b;break;}}
-            if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}
-            if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}
+            clickSendWhenReady(20);
           }
           // Wait until the selected state is visible before pasting
           function waitForModeAndPaste(retries) {
