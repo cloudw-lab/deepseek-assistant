@@ -3878,9 +3878,7 @@ function createMiniChat() {
           }
           function modeReady() {
             if (target === "\u5feb\u901f\u6a21\u5f0f") return true;
-            // Re-search (chosenModeEl may be stale after page reload)
-            var currentBtn = findTopModeClickable(target);
-            if (currentBtn && isSelected(currentBtn)) return true;
+            if (chosenModeEl && isSelected(chosenModeEl)) return true;
             return false;
           }
           function findTopModeClickable(t) {
@@ -4108,26 +4106,14 @@ function createMiniChat() {
             if (Q) clickSendWhenReady(120);
           }
           // Wait until the selected state is visible before pasting
-           function waitForModeAndPaste(retries) {
-             var ta = document.querySelector('textarea');
-             var ready = modeReady();
-             // Retry clicking mode button if not ready yet
-             if (!ready && retries === 8 && chosenModeEl) {
-               var re = chosenModeEl.getBoundingClientRect ? chosenModeEl.getBoundingClientRect() : null;
-               if (re && re.width > 0) {
-                 ['mousedown','mouseup','click'].forEach(function(type){
-                   chosenModeEl.dispatchEvent(new MouseEvent(type,{
-                     bubbles:true,cancelable:true,view:window,
-                     clientX:re.left+re.width/2,clientY:re.top+re.height/2,
-                     button:0,buttons:1
-                   }));
-                 });
-               }
-             }
-             if (ready && ta && ta.offsetParent && !ta.disabled) {
-               pasteImage(0);
-               return;
-             }
+          function waitForModeAndPaste(retries) {
+            var ta = document.querySelector('textarea');
+            var ready = modeReady();
+            if (ready && ta && ta.offsetParent && !ta.disabled) {
+              console.log('[MiniChatInject] mode ready, start paste');
+              pasteImage(0);
+              return;
+            }
             if (retries <= 0) {
               console.log('[MiniChatInject] mode wait timeout, force paste');
               pasteImage(0);
