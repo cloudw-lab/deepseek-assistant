@@ -4052,17 +4052,45 @@ function createMiniChat() {
               ta.dispatchEvent(new Event("change",{bubbles:true}));
               ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             }
-            // For image-only: try Enter on active element / document first, then fallback to button
+            // For image-only: keep pressing Enter until upload completes and send fires
             if (!Q && IMG_COUNT > 0) {
-              var target = document.activeElement || document.body;
-              target.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
-              target.dispatchEvent(new KeyboardEvent("keyup",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
-              // Also try pressing Enter on document.body to trigger global handler
-              setTimeout(function(){
-                document.body.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
-              }, 200);
+              var attempts = 0;
+              function tryEnterImage() {
+                attempts++;
+                // Press Enter on body - DeepSeek handles globally
+                var ev = new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true});
+                document.body.dispatchEvent(ev);
+                document.body.dispatchEvent(new KeyboardEvent("keyup",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
+                // Try active element too
+                var ae = document.activeElement;
+                if (ae && ae !== document.body) {
+                  ae.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
+                }
+                // Also try clicking the rightmost enabled button in the composer area
+                var btns = document.querySelectorAll("button,[role=button]");
+                var send = null;
+                for (var i=btns.length-1; i>=0; i--) {
+                  var b = btns[i];
+                  if (!b.offsetParent || b.disabled) continue;
+                  var r = b.getBoundingClientRect();
+                  if (r.width > 0 && r.height > 0 && r.width < 100 && r.height < 60) {
+                    send = b;
+                    break;
+                  }
+                }
+                if (send && !send.disabled) {
+                  var r2 = send.getBoundingClientRect();
+                  send.dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
+                  send.dispatchEvent(new MouseEvent("mouseup",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
+                  send.click();
+                }
+                // Keep trying until we've sent many attempts
+                if (attempts < 200) setTimeout(tryEnterImage, 500);
+              }
+              setTimeout(tryEnterImage, 600);
+              return; // Don't go to clickSendWhenReady for image-only
             }
-            if (Q || IMG_COUNT > 0) clickSendWhenReady(120);
+            if (Q) clickSendWhenReady(120);
           }
           // Wait until the selected state is visible before pasting
           function waitForModeAndPaste(retries) {
