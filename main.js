@@ -3582,6 +3582,28 @@ function createDesktopPet() {
 
 let miniChatWindow = null;
 let miniChatPollTimer = null;
+let miniChatConversationMode = null;
+
+function triggerMainChatNewConversation() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.webContents.executeJavaScript(`
+        (async function(){
+          var chatView = document.getElementById('chatView');
+          if (!chatView) return;
+          await chatView.executeJavaScript(
+            '(function(){' +
+            'var btn=document.querySelector("[aria-label=\\"New chat\\"], [aria-label=\\"新对话\\"]");' +
+            'if(!btn){var as=document.querySelectorAll("a");for(var i=0;i<as.length;i++){if(as[i].href&&as[i].href.indexOf("/chat")>=0&&!as[i].href.includes("/s/")){btn=as[i];break;}}}' +
+            'if(btn)btn.click();' +
+            'else{window.location.href="https://chat.deepseek.com/";}' +
+            '})()'
+          );
+        })()
+      `);
+    } catch(_) {}
+  }
+}
 
 function createMiniChat() {
   if (miniChatWindow && !miniChatWindow.isDestroyed()) {
@@ -3798,24 +3820,8 @@ function createMiniChat() {
   });
 
   ipcMain.on('mini:newchat', function() {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      try {
-        mainWindow.webContents.executeJavaScript(`
-          (async function(){
-            var chatView = document.getElementById('chatView');
-            if (!chatView) return;
-            await chatView.executeJavaScript(
-              '(function(){' +
-              'var btn=document.querySelector("[aria-label=\\"New chat\\"], [aria-label=\\"新对话\\"]");' +
-              'if(!btn){var as=document.querySelectorAll("a");for(var i=0;i<as.length;i++){if(as[i].href&&as[i].href.indexOf("/chat")>=0&&!as[i].href.includes("/s/")){btn=as[i];break;}}}' +
-              'if(btn)btn.click();' +
-              'else{window.location.href="https://chat.deepseek.com/";}' +
-              '})()'
-            );
-          })()
-        `);
-      } catch(_) {}
-    }
+    triggerMainChatNewConversation();
+    miniChatConversationMode = null;
   });
 
   ipcMain.on('mini:ask', function(_, payload) {
@@ -3824,8 +3830,14 @@ function createMiniChat() {
     var images = (payload && payload.images) || [];
     console.log('[MiniChat] ask q=' + (question||'').substring(0,30) + ' mode=' + mode + ' imgs=' + images.length);
     if (mainWindow && !mainWindow.isDestroyed()) {
+      var modeChanged = miniChatConversationMode && miniChatConversationMode !== mode;
+      if (modeChanged) {
+        console.log('[MiniChat] mode changed ' + miniChatConversationMode + ' -> ' + mode + ', starting new conversation');
+        triggerMainChatNewConversation();
+      }
+      miniChatConversationMode = mode;
       // Get webview's webContentsId, then inject and poll directly
-      mainWindow.webContents.executeJavaScript(
+      setTimeout(function(){ mainWindow.webContents.executeJavaScript(
         '(function(){var cv=document.getElementById("chatView");return cv?cv.getWebContentsId():-1})()'
       ).then(function(wcid) {
         if (wcid <= 0) {
@@ -4176,9 +4188,10 @@ function createMiniChat() {
             }).catch(function(e){});
           } catch(_) {}
         }, 2000);
-      }).catch(function(e) {
-        console.log('[MiniChat] wcid error:', e.message);
-      });
+        }).catch(function(e) {
+          console.log('[MiniChat] wcid error:', e.message);
+        });
+      }, modeChanged ? 1200 : 0);
     }
 
   });
