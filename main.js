@@ -3915,6 +3915,37 @@ function createMiniChat() {
             }
             return clickable || best;
           }
+          // If switching mode, start a new chat first, then switch mode after page loads
+          if (target !== "\u5feb\u901f\u6a21\u5f0f") {
+            var newChatBtns = document.querySelectorAll("button,[role=button],a");
+            for (var nc=0; nc<newChatBtns.length; nc++) {
+              var nb = newChatBtns[nc];
+              var ntxt = (nb.textContent||'').trim();
+              var naria = (nb.getAttribute('aria-label')||'').toLowerCase();
+              if (ntxt === '\u65b0\u5bf9\u8bdd' || naria.indexOf('new')>=0 || naria.indexOf('\u65b0\u5bf9\u8bdd')>=0) {
+                var nr = nb.getBoundingClientRect();
+                if (nr && nr.width > 0) {
+                  ['mousedown','mouseup','click'].forEach(function(type){
+                    nb.dispatchEvent(new MouseEvent(type,{
+                      bubbles:true,cancelable:true,view:window,
+                      clientX:nr.left+nr.width/2,clientY:nr.top+nr.height/2,
+                      button:0,buttons:1
+                    }));
+                  });
+                  // Delay mode switch to let new chat load
+                  setTimeout(function(){ doModeSwitch(); }, 800);
+                  var newChatClicked = true;
+                  break;
+                }
+              }
+            }
+            if (!newChatClicked) doModeSwitch();
+          } else {
+            doModeSwitch();
+          }
+
+          function doModeSwitch() {
+
           var chosenModeEl = null;
           var found = false;
           for (var p=0; p<patterns.length && !found; p++) {
@@ -4142,6 +4173,7 @@ function createMiniChat() {
              setTimeout(function(){ waitForModeAndPaste(retries - 1); }, 400);
            }
           setTimeout(function(){ waitForModeAndPaste(12); }, 800);
+          } // doModeSwitch
         }).toString()
           .replace("'PLACEHOLDER_Q'", JSON.stringify(question || ''))
           .replace("'PLACEHOLDER_M'", JSON.stringify(mode))
