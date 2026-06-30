@@ -4057,16 +4057,24 @@ function createMiniChat() {
               var attempts = 0;
               function tryEnterImage() {
                 attempts++;
+                // Check if already sent (AI response appearing or stop button present)
+                var aiMsgs = document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");
+                if (aiMsgs.length > 0 || document.querySelector("[aria-label*=\u505c\u6b62]") || document.querySelector("[aria-label*=\u53d1\u9001]")) {
+                  // If there are already AI messages or stop button, don't keep sending
+                  if (aiMsgs.length > 0) return;
+                  // If there's a stop button, sending already happened
+                  var stopBtn = document.querySelector("[aria-label*=\u505c\u6b62]");
+                  if (stopBtn && stopBtn.offsetParent) return;
+                }
                 // Press Enter on body - DeepSeek handles globally
                 var ev = new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true});
                 document.body.dispatchEvent(ev);
                 document.body.dispatchEvent(new KeyboardEvent("keyup",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
-                // Try active element too
                 var ae = document.activeElement;
                 if (ae && ae !== document.body) {
                   ae.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
                 }
-                // Also try clicking the rightmost enabled button in the composer area
+                // Try clicking a small enabled button (likely send)
                 var btns = document.querySelectorAll("button,[role=button]");
                 var send = null;
                 for (var i=btns.length-1; i>=0; i--) {
@@ -4084,11 +4092,16 @@ function createMiniChat() {
                   send.dispatchEvent(new MouseEvent("mouseup",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
                   send.click();
                 }
-                // Keep trying until we've sent many attempts
-                if (attempts < 200) setTimeout(tryEnterImage, 500);
+                // After attempting send, wait a bit and check if it took effect
+                setTimeout(function(){
+                  var newAi = document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");
+                  var stopB = document.querySelector("[aria-label*=\u505c\u6b62]");
+                  if (newAi.length > 0 || (stopB && stopB.offsetParent)) return; // Sent successfully
+                  if (attempts < 200) setTimeout(tryEnterImage, 700);
+                }, 1000);
               }
               setTimeout(tryEnterImage, 600);
-              return; // Don't go to clickSendWhenReady for image-only
+              return;
             }
             if (Q) clickSendWhenReady(120);
           }
