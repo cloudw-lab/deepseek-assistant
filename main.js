@@ -3870,9 +3870,14 @@ function createMiniChat() {
           if (target === "\u8bc6\u56fe") patterns = ["\u8bc6\u56fe", "vision", "V3", "DeepSeek-V3", "\u56fe\u7247\u7406\u89e3", "\u89c6\u89c9"];
           else if (target === "\u4e13\u5bb6") patterns = ["\u4e13\u5bb6", "expert", "R1", "DeepSeek-R1", "\u6df1\u5ea6\u601d\u8003"];
           else if (target !== "\u9ed8\u8ba4") patterns = [target];
-          var found = false;
-          for (var p=0; p<patterns.length && !found; p++) {
-            var t = patterns[p];
+          function isSelected(el) {
+            if (!el) return false;
+            var cls = ((el.className || '') + ' ' + (el.parentElement && el.parentElement.className || '')).toLowerCase();
+            var aria = el.getAttribute('aria-selected');
+            var state = el.getAttribute('data-state');
+            return aria === 'true' || state === 'active' || cls.indexOf('active') >= 0 || cls.indexOf('selected') >= 0 || cls.indexOf('current') >= 0;
+          }
+          function findTopModeClickable(t) {
             var all = document.querySelectorAll('*');
             var best = null;
             var bestTop = Infinity;
@@ -3889,22 +3894,27 @@ function createMiniChat() {
                 best = el;
               }
             }
-            if (best) {
-              var clickable = best;
-              while (clickable && clickable.tagName !== 'BUTTON' && clickable.tagName !== 'A' && clickable.getAttribute('role') !== 'tab' && clickable.getAttribute('role') !== 'button') {
-                clickable = clickable.parentElement;
-              }
-              if (clickable && clickable.tagName) {
-                var r = clickable.getBoundingClientRect();
-                ['mousedown','mouseup','click'].forEach(function(type){
-                  clickable.dispatchEvent(new MouseEvent(type,{
-                    bubbles:true,cancelable:true,view:window,
-                    clientX:r.left+r.width/2,clientY:r.top+r.height/2,
-                    button:0,buttons:1
-                  }));
-                });
-                found = true;
-              }
+            if (!best) return null;
+            var clickable = best;
+            while (clickable && clickable.tagName !== 'BUTTON' && clickable.tagName !== 'A' && clickable.getAttribute('role') !== 'tab' && clickable.getAttribute('role') !== 'button') {
+              clickable = clickable.parentElement;
+            }
+            return clickable || best;
+          }
+          var chosenModeEl = null;
+          var found = false;
+          for (var p=0; p<patterns.length && !found; p++) {
+            chosenModeEl = findTopModeClickable(patterns[p]);
+            if (chosenModeEl) {
+              var r = chosenModeEl.getBoundingClientRect();
+              ['mousedown','mouseup','click'].forEach(function(type){
+                chosenModeEl.dispatchEvent(new MouseEvent(type,{
+                  bubbles:true,cancelable:true,view:window,
+                  clientX:r.left+r.width/2,clientY:r.top+r.height/2,
+                  button:0,buttons:1
+                }));
+              });
+              found = true;
             }
           }
           // Paste images after mode switch settles
@@ -3943,16 +3953,21 @@ function createMiniChat() {
               ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             }
           }
-          // Wait for mode switch to settle, then wait for textarea to appear (page may reload)
-          function waitForTextareaAndPaste() {
+          // Wait until the selected state is visible before pasting
+          function waitForModeAndPaste(retries) {
             var ta = document.querySelector('textarea');
-            if (ta && ta.offsetParent && !ta.disabled) {
+            var modeReady = target === "\u9ed8\u8ba4" || !chosenModeEl || isSelected(chosenModeEl);
+            if (modeReady && ta && ta.offsetParent && !ta.disabled) {
               pasteImage(0);
-            } else {
-              setTimeout(waitForTextareaAndPaste, 400);
+              return;
             }
+            if (retries <= 0) {
+              pasteImage(0);
+              return;
+            }
+            setTimeout(function(){ waitForModeAndPaste(retries - 1); }, 400);
           }
-          setTimeout(waitForTextareaAndPaste, 1500);
+          setTimeout(function(){ waitForModeAndPaste(12); }, 800);
         }).toString()
           .replace("'PLACEHOLDER_Q'", JSON.stringify(question || ''))
           .replace("'PLACEHOLDER_M'", JSON.stringify(mode))
