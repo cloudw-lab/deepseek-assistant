@@ -3910,6 +3910,7 @@ function createMiniChat() {
           for (var p=0; p<patterns.length && !found; p++) {
             chosenModeEl = findTopModeClickable(patterns[p]);
             if (chosenModeEl) {
+              console.log('[MiniChatInject] mode candidate=', patterns[p], 'text=', (chosenModeEl.innerText || chosenModeEl.textContent || '').trim());
               var r = chosenModeEl.getBoundingClientRect();
               ['mousedown','mouseup','click'].forEach(function(type){
                 chosenModeEl.dispatchEvent(new MouseEvent(type,{
@@ -3921,13 +3922,15 @@ function createMiniChat() {
               found = true;
             }
           }
+          if (!found) console.log('[MiniChatInject] no mode candidate found for', target, patterns.join('|'));
           // Paste images after mode switch settles
           function pasteImage(idx) {
             if (idx >= IMG_COUNT) { typeAndSend(); return; }
             var d = IMG_DATA[idx];
             var ta = document.querySelector('textarea');
-            if (!ta) { setTimeout(function(){ pasteImage(idx); }, 300); return; }
+            if (!ta) { console.log('[MiniChatInject] paste waiting textarea idx=', idx); setTimeout(function(){ pasteImage(idx); }, 300); return; }
             try {
+              console.log('[MiniChatInject] paste start idx=', idx, 'mime=', d.mime, 'b64len=', d.b64 ? d.b64.length : 0);
               var raw=atob(d.b64);
               var bytes=new Uint8Array(raw.length);
               for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
@@ -3939,7 +3942,8 @@ function createMiniChat() {
               var ev=new ClipboardEvent('paste',{bubbles:true,cancelable:true});
               Object.defineProperty(ev,'clipboardData',{value:dt});
               ta.dispatchEvent(ev);
-            } catch(e) {}
+              console.log('[MiniChatInject] paste dispatched idx=', idx);
+            } catch(e) { console.log('[MiniChatInject] paste error idx=', idx, e && e.message ? e.message : String(e)); }
             setTimeout(function(){ pasteImage(idx+1); }, 600);
           }
           function clickSendWhenReady(retries) {
@@ -3949,14 +3953,17 @@ function createMiniChat() {
               if(form){
                 try {
                   if(typeof form.requestSubmit === 'function'){
+                    console.log('[MiniChatInject] requestSubmit()');
                     form.requestSubmit();
                     return;
                   }
                 } catch(_) {}
                 try {
+                  console.log('[MiniChatInject] dispatch submit event');
                   var submitEv = new Event('submit', {bubbles:true, cancelable:true});
                   form.dispatchEvent(submitEv);
                   if(!submitEv.defaultPrevented && typeof form.submit === 'function'){
+                    console.log('[MiniChatInject] native form.submit()');
                     form.submit();
                   }
                   return;
@@ -4005,6 +4012,7 @@ function createMiniChat() {
             }
             if(sBtn){
               var ariaDisabled=(sBtn.getAttribute("aria-disabled")||"").toLowerCase()==='true';
+              console.log('[MiniChatInject] send candidate text=', (sBtn.innerText || sBtn.textContent || '').trim(), 'disabled=', !!sBtn.disabled, 'ariaDisabled=', ariaDisabled, 'score=', bestScore);
               if(sBtn.disabled || ariaDisabled){
                 if(retries > 0) {
                   setTimeout(function(){ clickSendWhenReady(retries - 1); }, 500);
@@ -4012,6 +4020,7 @@ function createMiniChat() {
                 return;
               }
               var r=sBtn.getBoundingClientRect();
+              console.log('[MiniChatInject] clicking send button');
               ['mousedown','mouseup','click'].forEach(function(type){
                 sBtn.dispatchEvent(new MouseEvent(type,{
                   bubbles:true,cancelable:true,view:window,
@@ -4022,11 +4031,13 @@ function createMiniChat() {
               if(typeof sBtn.click === 'function') sBtn.click();
               return;
             }
+            console.log('[MiniChatInject] no send candidate, retries=', retries);
             if(retries > 0) {
               setTimeout(function(){ clickSendWhenReady(retries - 1); }, 500);
               return;
             }
             if(ta0){
+              console.log('[MiniChatInject] fallback enter key');
               ta0.focus();
               ta0.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             }
@@ -4034,6 +4045,7 @@ function createMiniChat() {
           function typeAndSend() {
             var ta=document.querySelector("textarea");
             if (Q && ta) {
+              console.log('[MiniChatInject] typing text len=', Q.length);
               var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;
               ns.call(ta,"");ns.call(ta,Q);ta.focus();
               ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:Q}));
@@ -4046,14 +4058,18 @@ function createMiniChat() {
           // Wait until the selected state is visible before pasting
           function waitForModeAndPaste(retries) {
             var ta = document.querySelector('textarea');
-            if (modeReady() && ta && ta.offsetParent && !ta.disabled) {
+            var ready = modeReady();
+            if (ready && ta && ta.offsetParent && !ta.disabled) {
+              console.log('[MiniChatInject] mode ready, start paste');
               pasteImage(0);
               return;
             }
             if (retries <= 0) {
+              console.log('[MiniChatInject] mode wait timeout, force paste');
               pasteImage(0);
               return;
             }
+            if (retries === 12 || retries === 6 || retries === 1) console.log('[MiniChatInject] waiting mode/textarea retries=', retries, 'ready=', ready, 'ta=', !!ta);
             setTimeout(function(){ waitForModeAndPaste(retries - 1); }, 400);
           }
           setTimeout(function(){ waitForModeAndPaste(12); }, 800);
