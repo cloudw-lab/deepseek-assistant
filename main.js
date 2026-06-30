@@ -3877,11 +3877,10 @@ function createMiniChat() {
             return aria === 'true' || state === 'active' || cls.indexOf('active') >= 0 || cls.indexOf('selected') >= 0 || cls.indexOf('current') >= 0;
           }
           function modeReady() {
-            try {
-              if (target === "\u5feb\u901f\u6a21\u5f0f") return true;
-              var currentBtn = findTopModeClickable(target);
-              if (currentBtn && isSelected(currentBtn)) return true;
-            } catch(e) {}
+            if (target === "\u5feb\u901f\u6a21\u5f0f") return true;
+            // Re-search (chosenModeEl may be stale after page reload)
+            var currentBtn = findTopModeClickable(target);
+            if (currentBtn && isSelected(currentBtn)) return true;
             return false;
           }
           function findTopModeClickable(t) {
@@ -4112,6 +4111,7 @@ function createMiniChat() {
            function waitForModeAndPaste(retries) {
              var ta = document.querySelector('textarea');
              var ready = modeReady();
+             // Retry clicking mode button if not ready yet
              if (!ready && retries === 8 && chosenModeEl) {
                var re = chosenModeEl.getBoundingClientRect ? chosenModeEl.getBoundingClientRect() : null;
                if (re && re.width > 0) {
@@ -4128,12 +4128,14 @@ function createMiniChat() {
                pasteImage(0);
                return;
              }
-             if (retries <= 0) {
-               pasteImage(0);
-               return;
-             }
-             setTimeout(function(){ waitForModeAndPaste(retries - 1); }, 400);
-           }
+            if (retries <= 0) {
+              console.log('[MiniChatInject] mode wait timeout, force paste');
+              pasteImage(0);
+              return;
+            }
+            if (retries === 12 || retries === 6 || retries === 1) console.log('[MiniChatInject] waiting mode/textarea retries=', retries, 'ready=', ready, 'ta=', !!ta);
+            setTimeout(function(){ waitForModeAndPaste(retries - 1); }, 400);
+          }
           setTimeout(function(){ waitForModeAndPaste(12); }, 800);
         }).toString()
           .replace("'PLACEHOLDER_Q'", JSON.stringify(question || ''))
