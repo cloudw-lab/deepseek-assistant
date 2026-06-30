@@ -3943,20 +3943,51 @@ function createMiniChat() {
             setTimeout(function(){ pasteImage(idx+1); }, 600);
           }
           function clickSendWhenReady(retries) {
-            var btns=document.querySelectorAll("button");var sBtn=null;
-            for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("\u53d1\u9001")>=0||txt==="send"||txt==="\u53d1\u9001"){sBtn=b;break;}}
-            if(!sBtn){
-              var ta0=document.querySelector("textarea");
-              var pbtns=ta0&&ta0.parentElement?ta0.parentElement.querySelectorAll("button"):[];
-              for(var j=pbtns.length-1;j>=0;j--){if(pbtns[j].offsetParent){sBtn=pbtns[j];break;}}
+            var ta0=document.querySelector("textarea");
+            var candidates = document.querySelectorAll("button,[role=button]");
+            var sBtn=null;
+            var bestScore = -Infinity;
+            for(var i=0;i<candidates.length;i++){
+              var b=candidates[i];
+              var rect=b.getBoundingClientRect();
+              if(!rect || rect.width<=0 || rect.height<=0) continue;
+              if(!b.offsetParent) continue;
+              var cls=(b.className||"").toLowerCase();
+              var aria=(b.getAttribute("aria-label")||"").toLowerCase();
+              var txt=(b.textContent||"").trim().toLowerCase();
+              var ariaDisabled=(b.getAttribute("aria-disabled")||"").toLowerCase()==='true';
+              if(b.disabled || ariaDisabled) continue;
+              var score = 0;
+              if(cls.indexOf("send")>=0 || aria.indexOf("send")>=0 || aria.indexOf("\u53d1\u9001")>=0 || txt==="send" || txt==="\u53d1\u9001") score += 1000;
+              if(b.querySelector && b.querySelector('svg')) score += 100;
+              if(ta0){
+                var taRect=ta0.getBoundingClientRect();
+                if(rect.top >= taRect.top - 40) score += 50;
+                score += Math.max(0, rect.left - taRect.left) / 10;
+              }
+              score += rect.top / 10;
+              if(score > bestScore){ bestScore = score; sBtn = b; }
             }
-            if(sBtn && !sBtn.disabled){
-              sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));
-              sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));
-              sBtn.click();
+            if(sBtn){
+              var r=sBtn.getBoundingClientRect();
+              ['mousedown','mouseup','click'].forEach(function(type){
+                sBtn.dispatchEvent(new MouseEvent(type,{
+                  bubbles:true,cancelable:true,view:window,
+                  clientX:r.left+r.width/2,clientY:r.top+r.height/2,
+                  button:0,buttons:1
+                }));
+              });
+              if(typeof sBtn.click === 'function') sBtn.click();
               return;
             }
-            if(retries > 0) setTimeout(function(){ clickSendWhenReady(retries - 1); }, 400);
+            if(retries > 0) {
+              setTimeout(function(){ clickSendWhenReady(retries - 1); }, 500);
+              return;
+            }
+            if(ta0){
+              ta0.focus();
+              ta0.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
+            }
           }
           function typeAndSend() {
             var ta=document.querySelector("textarea");
