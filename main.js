@@ -3841,17 +3841,40 @@ function createMiniChat() {
         }
         console.log('[MiniChat] wcid=' + wcid + ' injecting question');
 
-        // If images, just focus main window for manual paste - no auto-paste
+        // Auto-paste images via atob+Blob+File into webview file input
         if (images.length > 0) {
-          console.log('[MiniChat] ' + images.length + ' images - focus main window');
-          if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
-          if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '图片请粘贴到主窗口');
+          var fs = require('fs');
+          images.forEach(function(imgPath, idx) {
+            try {
+              var ext = require('path').extname(imgPath).toLowerCase();
+              var mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
+              var b64 = fs.readFileSync(imgPath).toString('base64');
+              var code = '(' + (function(){
+                var B64='PLACEHOLDER_B64';
+                var MIME='PLACEHOLDER_MIME';
+                var raw=atob(B64);
+                var bytes=new Uint8Array(raw.length);
+                for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+                var blob=new Blob([bytes],{type:MIME});
+                var file=new File([blob],'image.'+(MIME.split('/')[1]||'png'),{type:MIME});
+                var dt=new DataTransfer();
+                dt.items.add(file);
+                var fi=document.querySelector('input[type="file"]');
+                if(!fi){fi=document.createElement('input');fi.type='file';fi.style.display='none';document.body.appendChild(fi);}
+                Object.defineProperty(fi,'files',{value:dt.files});
+                fi.dispatchEvent(new Event('change',{bubbles:true}));
+              }).toString().replace('PLACEHOLDER_B64', JSON.stringify(b64)).replace('PLACEHOLDER_MIME', JSON.stringify(mime)) + ')()';
+              setTimeout(function() { wc.executeJavaScript(code); }, idx * 600);
+              console.log('[MiniChat] queued image ' + idx + ' (' + (b64.length/1024).toFixed(0) + 'KB)');
+            } catch(e) { console.log('[MiniChat] image err:', e.message); }
+          });
         }
-        // Only inject text if there IS text
+
+        // Inject text question
         if (question) {
           injectAndPoll();
         } else if (images.length === 0) {
-          return; // Nothing to do
+          return;
         }
 
         function injectAndPoll() {
