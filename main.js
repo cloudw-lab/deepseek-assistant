@@ -3874,26 +3874,36 @@ function createMiniChat() {
           for (var p=0; p<patterns.length && !found; p++) {
             var t = patterns[p];
             var all = document.querySelectorAll('*');
-            for (var i=all.length-1; i>=0; i--) {
+            var best = null;
+            var bestTop = Infinity;
+            for (var i=0; i<all.length; i++) {
               var el = all[i];
               var txt = (el.textContent || '').trim();
-              if ((txt === t || txt.indexOf(t) >= 0) && el.children.length === 0) {
-                while (el && el.tagName !== 'BUTTON' && el.tagName !== 'A' && el.getAttribute('role') !== 'tab' && el.getAttribute('role') !== 'button') {
-                  el = el.parentElement;
-                  if (!el) break;
-                }
-                if (el && el.tagName) {
-                  var r = el.getBoundingClientRect();
-                  ['mousedown','mouseup','click'].forEach(function(type){
-                    el.dispatchEvent(new MouseEvent(type,{
-                      bubbles:true,cancelable:true,view:window,
-                      clientX:r.left+r.width/2,clientY:r.top+r.height/2,
-                      button:0,buttons:1
-                    }));
-                  });
-                  found = true;
-                  break;
-                }
+              if (el.children.length > 0) continue;
+              if (txt !== t) continue;
+              var rect = el.getBoundingClientRect();
+              if (!rect || rect.width <= 0 || rect.height <= 0) continue;
+              if (rect.top < 0 || rect.top > Math.min(window.innerHeight * 0.65, 700)) continue;
+              if (rect.top < bestTop) {
+                bestTop = rect.top;
+                best = el;
+              }
+            }
+            if (best) {
+              var clickable = best;
+              while (clickable && clickable.tagName !== 'BUTTON' && clickable.tagName !== 'A' && clickable.getAttribute('role') !== 'tab' && clickable.getAttribute('role') !== 'button') {
+                clickable = clickable.parentElement;
+              }
+              if (clickable && clickable.tagName) {
+                var r = clickable.getBoundingClientRect();
+                ['mousedown','mouseup','click'].forEach(function(type){
+                  clickable.dispatchEvent(new MouseEvent(type,{
+                    bubbles:true,cancelable:true,view:window,
+                    clientX:r.left+r.width/2,clientY:r.top+r.height/2,
+                    button:0,buttons:1
+                  }));
+                });
+                found = true;
               }
             }
           }
