@@ -3946,12 +3946,12 @@ function createMiniChat() {
               ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:Q}));
               ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:Q}));
               ta.dispatchEvent(new Event("change",{bubbles:true}));
-              var btns=document.querySelectorAll("button");var sBtn=null;
-              for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("\u53d1\u9001")>=0||txt==="send"||txt==="\u53d1\u9001"){sBtn=b;break;}}
-              if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}
-              if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}
               ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             }
+            var btns=document.querySelectorAll("button");var sBtn=null;
+            for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();var aria=(b.getAttribute("aria-label")||"").toLowerCase();var txt=(b.textContent||"").trim().toLowerCase();if(cls.indexOf("send")>=0||aria.indexOf("send")>=0||aria.indexOf("\u53d1\u9001")>=0||txt==="send"||txt==="\u53d1\u9001"){sBtn=b;break;}}
+            if(!sBtn){var pbtns=ta.parentElement?ta.parentElement.querySelectorAll("button"):[];for(var j=pbtns.length-1;j>=0;j--){if(!pbtns[j].disabled&&pbtns[j].offsetParent){sBtn=pbtns[j];break;}}}
+            if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}
           }
           // Wait until the selected state is visible before pasting
           function waitForModeAndPaste(retries) {
