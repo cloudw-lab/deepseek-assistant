@@ -3859,10 +3859,13 @@ function createMiniChat() {
                 var file=new File([blob],'image.'+(MIME.split('/')[1]||'png'),{type:MIME});
                 var dt=new DataTransfer();
                 dt.items.add(file);
-                var fi=document.querySelector('input[type="file"]');
-                if(!fi){fi=document.createElement('input');fi.type='file';fi.style.display='none';document.body.appendChild(fi);}
-                Object.defineProperty(fi,'files',{value:dt.files});
-                fi.dispatchEvent(new Event('change',{bubbles:true}));
+                var ta=document.querySelector('textarea');
+                if(ta){
+                  ta.focus();
+                  var ev=new ClipboardEvent('paste',{bubbles:true,cancelable:true});
+                  Object.defineProperty(ev,'clipboardData',{value:dt});
+                  ta.dispatchEvent(ev);
+                }
               }).toString().replace("'PLACEHOLDER_B64'", JSON.stringify(b64)).replace("'PLACEHOLDER_MIME'", JSON.stringify(mime)) + ')()';
               setTimeout(function() { wc.executeJavaScript(code); }, idx * 600);
               console.log('[MiniChat] queued image ' + idx + ' (' + (b64.length/1024).toFixed(0) + 'KB)');
