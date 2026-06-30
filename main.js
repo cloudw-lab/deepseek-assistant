@@ -3877,6 +3877,13 @@ function createMiniChat() {
             var state = el.getAttribute('data-state');
             return aria === 'true' || state === 'active' || cls.indexOf('active') >= 0 || cls.indexOf('selected') >= 0 || cls.indexOf('current') >= 0;
           }
+          function modeReady() {
+            if (target === "\u5feb\u901f\u6a21\u5f0f") return true;
+            var pageText = (document.body && document.body.innerText || '');
+            if (pageText.indexOf('\u4f7f\u7528' + target + '\u5f00\u59cb\u5bf9\u8bdd') >= 0) return true;
+            if (chosenModeEl && isSelected(chosenModeEl)) return true;
+            return false;
+          }
           function findTopModeClickable(t) {
             var all = document.querySelectorAll('*');
             var best = null;
@@ -3906,13 +3913,21 @@ function createMiniChat() {
           for (var p=0; p<patterns.length && !found; p++) {
             chosenModeEl = findTopModeClickable(patterns[p]);
             if (chosenModeEl) {
-              var r = chosenModeEl.getBoundingClientRect();
-              ['mousedown','mouseup','click'].forEach(function(type){
-                chosenModeEl.dispatchEvent(new MouseEvent(type,{
-                  bubbles:true,cancelable:true,view:window,
-                  clientX:r.left+r.width/2,clientY:r.top+r.height/2,
-                  button:0,buttons:1
-                }));
+              var chain = [];
+              var cur = chosenModeEl;
+              for (var k = 0; cur && k < 5; k++) {
+                chain.push(cur);
+                cur = cur.parentElement;
+              }
+              chain.forEach(function(node){
+                var r = node.getBoundingClientRect();
+                ['mousedown','mouseup','click'].forEach(function(type){
+                  node.dispatchEvent(new MouseEvent(type,{
+                    bubbles:true,cancelable:true,view:window,
+                    clientX:r.left+r.width/2,clientY:r.top+r.height/2,
+                    button:0,buttons:1
+                  }));
+                });
               });
               found = true;
             }
@@ -3969,8 +3984,7 @@ function createMiniChat() {
           // Wait until the selected state is visible before pasting
           function waitForModeAndPaste(retries) {
             var ta = document.querySelector('textarea');
-            var modeReady = target === "\u9ed8\u8ba4" || !chosenModeEl || isSelected(chosenModeEl);
-            if (modeReady && ta && ta.offsetParent && !ta.disabled) {
+            if (modeReady() && ta && ta.offsetParent && !ta.disabled) {
               pasteImage(0);
               return;
             }
