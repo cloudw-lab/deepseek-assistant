@@ -3955,20 +3955,27 @@ function createMiniChat() {
               var cls=(b.className||"").toLowerCase();
               var aria=(b.getAttribute("aria-label")||"").toLowerCase();
               var txt=(b.textContent||"").trim().toLowerCase();
-              var ariaDisabled=(b.getAttribute("aria-disabled")||"").toLowerCase()==='true';
-              if(b.disabled || ariaDisabled) continue;
               var score = 0;
               if(cls.indexOf("send")>=0 || aria.indexOf("send")>=0 || aria.indexOf("\u53d1\u9001")>=0 || txt==="send" || txt==="\u53d1\u9001") score += 1000;
               if(b.querySelector && b.querySelector('svg')) score += 100;
               if(ta0){
                 var taRect=ta0.getBoundingClientRect();
-                if(rect.top >= taRect.top - 40) score += 50;
-                score += Math.max(0, rect.left - taRect.left) / 10;
+                // prefer buttons in the same composer region, and especially on the right side
+                if(rect.top >= taRect.top - 80 && rect.top <= taRect.bottom + 120) score += 200;
+                if(rect.left >= taRect.left) score += Math.max(0, rect.left - taRect.left) / 4;
+                if(rect.left > taRect.right - 30) score += 200;
               }
-              score += rect.top / 10;
+              score += rect.top / 20;
               if(score > bestScore){ bestScore = score; sBtn = b; }
             }
             if(sBtn){
+              var ariaDisabled=(sBtn.getAttribute("aria-disabled")||"").toLowerCase()==='true';
+              if(sBtn.disabled || ariaDisabled){
+                if(retries > 0) {
+                  setTimeout(function(){ clickSendWhenReady(retries - 1); }, 500);
+                }
+                return;
+              }
               var r=sBtn.getBoundingClientRect();
               ['mousedown','mouseup','click'].forEach(function(type){
                 sBtn.dispatchEvent(new MouseEvent(type,{
@@ -3999,7 +4006,7 @@ function createMiniChat() {
               ta.dispatchEvent(new Event("change",{bubbles:true}));
               ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             }
-            clickSendWhenReady(20);
+            clickSendWhenReady(120);
           }
           // Wait until the selected state is visible before pasting
           function waitForModeAndPaste(retries) {
