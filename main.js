@@ -3830,11 +3830,8 @@ function createMiniChat() {
     var images = (payload && payload.images) || [];
     console.log('[MiniChat] ask q=' + (question||'').substring(0,30) + ' mode=' + mode + ' imgs=' + images.length);
     if (mainWindow && !mainWindow.isDestroyed()) {
-      var modeChanged = miniChatConversationMode && miniChatConversationMode !== mode;
-      if (modeChanged) {
-        console.log('[MiniChat] mode changed ' + miniChatConversationMode + ' -> ' + mode + ', starting new conversation');
-        triggerMainChatNewConversation();
-      }
+      var prevMode = miniChatConversationMode;
+      var modeChanged = prevMode && prevMode !== mode;
       miniChatConversationMode = mode;
       // Get webview's webContentsId, then inject and poll directly
       setTimeout(function(){ mainWindow.webContents.executeJavaScript(
@@ -3850,6 +3847,17 @@ function createMiniChat() {
           console.log('[MiniChat] webContents not found');
           if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '主窗口未就绪');
           return;
+        }
+        if (modeChanged) {
+          console.log('[MiniChat] mode changed ' + prevMode + ' -> ' + mode + ', starting new conversation');
+          wc.executeJavaScript(
+            '(function(){' +
+            'var btn=document.querySelector("[aria-label=\\"New chat\\"], [aria-label=\\"新对话\\"]");' +
+            'if(!btn){var as=document.querySelectorAll("a");for(var i=0;i<as.length;i++){if(as[i].href&&as[i].href.indexOf("/chat")>=0&&!as[i].href.includes("/s/")){btn=as[i];break;}}}' +
+            'if(btn)btn.click();' +
+            'else{window.location.href="https://chat.deepseek.com/";}' +
+            '})()'
+          ).catch(function(e){ console.log('[MiniChat] new chat click failed:', e.message); });
         }
         console.log('[MiniChat] wcid=' + wcid + ' injecting question');
 
