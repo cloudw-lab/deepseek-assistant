@@ -3890,12 +3890,12 @@ function createMiniChat() {
             var bestTop = Infinity;
             for (var i=0; i<all.length; i++) {
               var el = all[i];
-              var txt = (el.textContent || '').trim();
-              if (el.children.length > 0) continue;
+              var txt = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
               if (!(txt === t || txt.indexOf(t) >= 0)) continue;
               var rect = el.getBoundingClientRect();
               if (!rect || rect.width <= 0 || rect.height <= 0) continue;
               if (rect.top < 0 || rect.top > Math.min(window.innerHeight * 0.65, 700)) continue;
+              if (rect.width < 40 || rect.height < 20) continue;
               if (rect.top < bestTop) {
                 bestTop = rect.top;
                 best = el;
