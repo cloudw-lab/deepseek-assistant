@@ -3862,7 +3862,7 @@ function createMiniChat() {
           var M='PLACEHOLDER_M';
           var IMG_COUNT = 0;
           var IMG_DATA = [];  // [{b64,mime},...]
-          // Switch mode - search all leaf elements for exact target text
+          // Switch mode - find leaf with target text, click with full MouseEvent
           var modeMap={"default":"\u9ed8\u8ba4","DEFAULT":"\u9ed8\u8ba4","expert":"\u4e13\u5bb6","EXPERT":"\u4e13\u5bb6","vision":"\u8bc6\u56fe","VISION":"\u8bc6\u56fe"};
           var target=modeMap[M]||"\u9ed8\u8ba4";
           if (target !== "\u9ed8\u8ba4") {
@@ -3871,11 +3871,23 @@ function createMiniChat() {
               var el = all[i];
               var txt = (el.textContent || '').trim();
               if (txt === target && el.children.length === 0) {
-                el = el.closest('button, [role=tab], [role=button], a, div[class*="mode"], div[class*="tab"], div[class*="switch"]') || el.parentElement || el;
-                el.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
-                el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));
-                el.click();
-                break;
+                // Walk up to clickable ancestor
+                var clickable = el;
+                while (clickable && clickable.tagName !== 'BUTTON' && clickable.tagName !== 'A' && clickable.getAttribute('role') !== 'tab' && clickable.getAttribute('role') !== 'button') {
+                  clickable = clickable.parentElement;
+                }
+                if (clickable && clickable.tagName) {
+                  var r = clickable.getBoundingClientRect();
+                  ['mousedown','mouseup','click'].forEach(function(type){
+                    clickable.dispatchEvent(new MouseEvent(type,{
+                      bubbles:true,cancelable:true,view:window,
+                      clientX:r.left+r.width/2,clientY:r.top+r.height/2,
+                      screenX:r.left+r.width/2,screenY:r.top+r.height/2,
+                      button:0,buttons:1
+                    }));
+                  });
+                  break;
+                }
               }
             }
           }
