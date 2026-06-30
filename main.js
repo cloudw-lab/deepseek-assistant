@@ -3876,6 +3876,11 @@ function createMiniChat() {
             var state = el.getAttribute('data-state');
             return aria === 'true' || state === 'active' || cls.indexOf('active') >= 0 || cls.indexOf('selected') >= 0 || cls.indexOf('current') >= 0;
           }
+          function modeReady() {
+            if (target === "\u5feb\u901f\u6a21\u5f0f") return true;
+            if (chosenModeEl && isSelected(chosenModeEl)) return true;
+            return false;
+          }
           function findTopModeClickable(t) {
             var all = document.querySelectorAll('*');
             var best = null;
