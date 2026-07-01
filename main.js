@@ -4065,9 +4065,9 @@ function createMiniChat() {
             } catch(e) { console.log('[MiniChatInject] paste error idx=', idx, e && e.message ? e.message : String(e)); }
             setTimeout(function(){ pasteImage(idx+1); }, 600);
           }
-          function clickSendWhenReady(retries) {
+          function clickSendWhenReady(retries, allowFormSubmit) {
             var ta0=document.querySelector("textarea");
-            if(ta0){
+            if(allowFormSubmit && ta0){
               var form = ta0.closest ? ta0.closest('form') : null;
               if(form){
                 try {
@@ -4134,7 +4134,7 @@ function createMiniChat() {
               console.log('[MiniChatInject] send candidate text=', (sBtn.innerText || sBtn.textContent || '').trim(), 'disabled=', !!sBtn.disabled, 'ariaDisabled=', ariaDisabled, 'score=', bestScore);
               if(sBtn.disabled || ariaDisabled){
                 if(retries > 0) {
-                  setTimeout(function(){ clickSendWhenReady(retries - 1); }, 500);
+                  setTimeout(function(){ clickSendWhenReady(retries - 1, allowFormSubmit); }, 500);
                 }
                 return;
               }
@@ -4152,7 +4152,7 @@ function createMiniChat() {
             }
             console.log('[MiniChatInject] no send candidate, retries=', retries);
             if(retries > 0) {
-              setTimeout(function(){ clickSendWhenReady(retries - 1); }, 500);
+              setTimeout(function(){ clickSendWhenReady(retries - 1, allowFormSubmit); }, 500);
               return;
             }
             if(ta0){
@@ -4232,7 +4232,7 @@ function createMiniChat() {
               setTimeout(tryEnterImage, 600);
               return;
             }
-            if (Q) clickSendWhenReady(120);
+            if (Q) clickSendWhenReady(120, true);
           }
           // Wait until the selected state is visible before pasting
           function waitForModeAndPaste(retries) {
