@@ -116,8 +116,13 @@ if (nativeFetch) {
       });
     }
 
+    // Log all DeepSeek API URLs to find the correct chat endpoint
+    if (isDeepSeekApiUrl(url)) {
+      ipcRenderer.send('app:diagnosticLog', 'API fetch: ' + url.slice(0, 120));
+    }
+
     // Intercept DeepSeek chat completion SSE for real-time streaming
-    if (isDeepSeekApiUrl(url) && (url.indexOf('/chat/completion') >= 0 || url.indexOf('/chat/create') >= 0)) {
+    if (isDeepSeekApiUrl(url) && (url.indexOf('/completion') >= 0 || url.indexOf('/chat') >= 0)) {
       ipcRenderer.send('app:diagnosticLog', 'SSE intercept: ' + url.slice(0, 80));
       return nativeFetch(input, init).then(function(response) {
         ipcRenderer.send('app:diagnosticLog', 'SSE response status: ' + response.status);
