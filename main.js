@@ -3632,6 +3632,7 @@ function createDesktopPet() {
 let miniChatWindow = null;
 let miniChatPollTimer = null;
 let miniChatConversationMode = null;
+let sseActive = false;
 
 function triggerMainChatNewConversation() {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -4292,10 +4293,13 @@ function createMiniChat() {
               }
               if ((stable >= 4 || attempts > 60) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
                 clearInterval(miniChatPollTimer); miniChatPollTimer = null;
-                var answer = lastText.replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
-                miniChatWindow.webContents.send('mini:replyComplete', answer);
-                // Agent loop: check if AI response calls for local tool execution
-                runAgentLoop(answer, wcid);
+                // Only send polling result if SSE hasn't delivered content
+                if (!sseActive) {
+                  var answer = lastText.replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
+                  miniChatWindow.webContents.send('mini:replyComplete', answer);
+                  // Agent loop: check if AI response calls for local tool execution
+                  runAgentLoop(answer, wcid);
+                }
               }
               if (attempts > 90 && lastText.length === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
                 clearInterval(miniChatPollTimer); miniChatPollTimer = null;
@@ -4345,8 +4349,10 @@ function createMiniChat() {
     if (!miniChatWindow || miniChatWindow.isDestroyed()) return;
     if (chunk === '__END__') {
       miniChatWindow.webContents.send('mini:replyComplete', '');
+      sseActive = false;
       return;
     }
+    sseActive = true;
     miniChatWindow.webContents.send('mini:reply', chunk);
   });
 }
