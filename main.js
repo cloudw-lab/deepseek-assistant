@@ -4170,6 +4170,11 @@ function createMiniChat() {
               dbg('send candidate text=', (sBtn.innerText || sBtn.textContent || '').trim(), 'disabled=', !!sBtn.disabled, 'ariaDisabled=', ariaDisabled, 'score=', bestScore);
               if(sBtn.disabled || ariaDisabled){
                 if(retries > 0) {
+                  if (ta0) {
+                    ta0.focus();
+                    ta0.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,metaKey:true,bubbles:true,composed:true,cancelable:true}));
+                    ta0.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,ctrlKey:true,bubbles:true,composed:true,cancelable:true}));
+                  }
                   setTimeout(function(){ clickSendWhenReady(retries - 1, allowFormSubmit); }, 500);
                 }
                 return;
@@ -4190,6 +4195,11 @@ function createMiniChat() {
             }
             dbg('no send candidate, retries=', retries);
             if(retries > 0) {
+              if (ta0) {
+                ta0.focus();
+                ta0.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,metaKey:true,bubbles:true,composed:true,cancelable:true}));
+                ta0.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,ctrlKey:true,bubbles:true,composed:true,cancelable:true}));
+              }
               setTimeout(function(){ clickSendWhenReady(retries - 1, allowFormSubmit); }, 500);
               return;
             }
@@ -4209,7 +4219,7 @@ function createMiniChat() {
               ta.dispatchEvent(new Event("change",{bubbles:true}));
             }
             if (!Q && IMG_COUNT > 0) {
-              clickSendWhenReady(200, false);
+              clickSendWhenReady(200, true);
               return;
             }
             if (Q) clickSendWhenReady(120, true);
