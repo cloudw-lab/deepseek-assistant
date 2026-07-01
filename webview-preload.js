@@ -116,6 +116,44 @@ if (nativeFetch) {
       });
     }
 
+    // Intercept DeepSeek chat completion SSE for real-time streaming
+    if (isDeepSeekApiUrl(url) && (url.indexOf('/chat/completion') >= 0 || url.indexOf('/chat/create') >= 0)) {
+      return nativeFetch(input, init).then(function(response) {
+        try {
+          var cloned = response.clone();
+          var reader = cloned.body && cloned.body.getReader ? cloned.body.getReader() : null;
+          if (reader) {
+            var decoder = new TextDecoder();
+            var buffer = '';
+            function readStream() {
+              reader.read().then(function(result) {
+                if (result.done) { ipcRenderer.send('chat:chunk', '__END__'); return; }
+                buffer += decoder.decode(result.value, {stream: true});
+                var lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                for (var i = 0; i < lines.length; i++) {
+                  var line = lines[i].trim();
+                  if (!line.startsWith('data: ')) continue;
+                  var data = line.slice(6);
+                  if (data === '[DONE]') { ipcRenderer.send('chat:chunk', '__END__'); return; }
+                  try {
+                    var parsed = JSON.parse(data);
+                    var delta = parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
+                    if (delta && delta.content) {
+                      ipcRenderer.send('chat:chunk', delta.content);
+                    }
+                  } catch(_) {}
+                }
+                readStream();
+              });
+            }
+            readStream();
+          }
+        } catch(_) {}
+        return response;
+      });
+    }
+
     return nativeFetch(input, init);
   };
 }

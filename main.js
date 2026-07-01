@@ -3644,6 +3644,8 @@ function createMiniChat() {
     .msg.user { background:#4D6BFE; color:#fff; margin-left:auto; text-align:right; }
     .msg.ai { background:rgba(63,63,70,.7); color:#e4e4e7; margin-right:auto; }
     .msg.ai.loading { opacity:.5; }
+    .cursor { animation: blink 1s step-end infinite; }
+    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
     .input-row { display:flex; padding:10px 14px; gap:8px; border-top:1px solid rgba(255,255,255,.06); }
     .input-row textarea { flex:1; background:rgba(255,255,255,.06); border:none; border-radius:10px;
       padding:8px 12px; color:#fff; outline:none; resize:none; font:13px/1.5 -apple-system,sans-serif; height:36px; }
@@ -3776,8 +3778,36 @@ function createMiniChat() {
       ipcRenderer.on('mini:reply', function(_, text) {
         var loading = document.getElementById('loading');
         if (loading) loading.remove();
-        document.getElementById('msgs').innerHTML += '<div class="msg ai">'+text.replace(/</g,'&lt;')+'</div>';
-        document.getElementById('msgs').scrollTop = document.getElementById('msgs').scrollHeight;
+        // Streaming: append to last AI message
+        if (text === '__STREAM_END__' || text === '__END__') return;
+        var msgs = document.getElementById('msgs');
+        var lastAi = msgs.querySelector('.msg.ai:last-child');
+        if (lastAi && !lastAi.classList.contains('complete')) {
+          var cur = lastAi.innerHTML;
+          // Strip trailing cursor
+          cur = cur.replace(/<span class="cursor">\|<\/span>$/, '');
+          lastAi.innerHTML = cur + text.replace(/</g,'&lt;') + '<span class="cursor">|</span>';
+        } else {
+          msgs.innerHTML += '<div class="msg ai">' + text.replace(/</g,'&lt;') + '<span class="cursor">|</span></div>';
+        }
+        msgs.scrollTop = msgs.scrollHeight;
+      });
+      ipcRenderer.on('mini:replyComplete', function(_, text) {
+        var msgs = document.getElementById('msgs');
+        var lastAi = msgs.querySelector('.msg.ai:last-child');
+        if (text && !lastAi) {
+          // Full reply from polling, create new message
+          msgs.innerHTML += '<div class="msg ai complete">' + text.replace(/</g,'&lt;') + '</div>';
+        } else if (text && lastAi) {
+          // Full reply from polling, replace streaming content
+          lastAi.innerHTML = text.replace(/</g,'&lt;');
+          lastAi.classList.add('complete');
+        } else if (lastAi) {
+          // SSE stream ended, remove cursor
+          lastAi.innerHTML = lastAi.innerHTML.replace(/<span class="cursor">\|<\/span>$/, '');
+          lastAi.classList.add('complete');
+        }
+        msgs.scrollTop = msgs.scrollHeight;
       });
     </script></body></html>`;
 
@@ -3794,6 +3824,7 @@ function createMiniChat() {
   ipcMain.removeAllListeners('mini:pickImage');
   ipcMain.removeAllListeners('mini:pasteImage');
   ipcMain.removeAllListeners('mini:move');
+  ipcMain.removeAllListeners('chat:chunk');
 
   ipcMain.on('mini:pickImage', function() {
     const { dialog } = require('electron');
@@ -4173,7 +4204,7 @@ function createMiniChat() {
               if ((stable >= 4 || attempts > 60) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
                 clearInterval(miniChatPollTimer); miniChatPollTimer = null;
                 var answer = lastText.replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
-                miniChatWindow.webContents.send('mini:reply', answer);
+                miniChatWindow.webContents.send('mini:replyComplete', answer);
               }
               if (attempts > 90 && lastText.length === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
                 clearInterval(miniChatPollTimer); miniChatPollTimer = null;
@@ -4216,6 +4247,16 @@ function createMiniChat() {
       var pos = miniChatWindow.getPosition();
       miniChatWindow.setPosition(Math.round(pos[0] + dx), Math.round(pos[1] + dy));
     }
+  });
+
+  // Real-time streaming tokens from webview SSE interception
+  ipcMain.on('chat:chunk', function(_, chunk) {
+    if (!miniChatWindow || miniChatWindow.isDestroyed()) return;
+    if (chunk === '__END__') {
+      miniChatWindow.webContents.send('mini:replyComplete', '');
+      return;
+    }
+    miniChatWindow.webContents.send('mini:reply', chunk);
   });
 }
 
