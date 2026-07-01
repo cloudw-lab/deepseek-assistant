@@ -89,89 +89,83 @@ function decodeBase64ToUint8Array(base64) {
   return bytes;
 }
 
+// ============================================================
+// Fetch interceptor - survives main-world.js override via defineProperty
+// ============================================================
 if (nativeFetch) {
-  globalThis.fetch = function(input, init) {
-    var url = typeof input === 'string' ? input : (input && input.url) || '';
+  var _realFetch = nativeFetch;
 
-    if (isBingSearchUrl(url)) {
-      var headers = headersToObject(init && init.headers ? init.headers : (input && input.headers ? input.headers : undefined));
-      var body = init && Object.prototype.hasOwnProperty.call(init, 'body') ? init.body : undefined;
-      if (body != null && typeof body !== 'string' && !(body instanceof Uint8Array)) {
-        body = String(body);
-      }
-      return ipcRenderer.invoke('app:fetchBingDiagnostic', {
-        url: url,
-        method: (init && init.method) || (input && input.method) || 'GET',
-        headers: headers,
-        body: body,
-      }).then(function(result) {
-        return new Response(result.bodyText || '', {
-          status: result.status,
-          statusText: result.statusText,
-          headers: { 'content-type': 'text/html; charset=utf-8' },
-        });
-      }).catch(function(err) {
-        console.error('[webview-preload] Bing proxy failed:', err.message);
-        throw err;
-      });
-    }
+  function makeWrapper(innerFetch) {
+    return function(input, init) {
+      var url = typeof input === 'string' ? input : (input && input.url) || '';
 
-    // Log all DeepSeek API URLs to find the correct chat endpoint
-    if (isDeepSeekApiUrl(url)) {
-      ipcRenderer.send('app:diagnosticLog', 'API fetch: ' + url.slice(0, 120));
-    }
-
-    // Intercept DeepSeek chat completion SSE for real-time streaming
-    if (isDeepSeekApiUrl(url) && (url.indexOf('/completion') >= 0 || url.indexOf('/chat') >= 0)) {
-      ipcRenderer.send('app:diagnosticLog', 'SSE intercept: ' + url.slice(0, 80));
-      return nativeFetch(input, init).then(function(response) {
-        ipcRenderer.send('app:diagnosticLog', 'SSE response status: ' + response.status);
-        try {
-          var cloned = response.clone();
-          var reader = cloned.body && cloned.body.getReader ? cloned.body.getReader() : null;
-          if (reader) {
-            var decoder = new TextDecoder();
-            var buffer = '';
-            function readStream() {
-              reader.read().then(function(result) {
-                if (result.done) { ipcRenderer.send('chat:chunk', '__END__'); return; }
-                buffer += decoder.decode(result.value, {stream: true});
-                var lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-                for (var i = 0; i < lines.length; i++) {
-                  var line = lines[i].trim();
-                  if (!line.startsWith('data: ')) continue;
-                  var data = line.slice(6);
-                  if (data === '[DONE]') { ipcRenderer.send('chat:chunk', '__END__'); return; }
-                  try {
-                    var parsed = JSON.parse(data);
-                    var delta = parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
-                    if (delta && delta.content) {
-                      ipcRenderer.send('chat:chunk', delta.content);
-                    }
-                  } catch(_) {}
-                }
-                readStream();
-              }).catch(function(e) {
-                ipcRenderer.send('app:diagnosticLog', 'SSE read error: ' + e.message);
-              });
-            }
-            readStream();
-          } else {
-            ipcRenderer.send('app:diagnosticLog', 'SSE no reader available');
-          }
-        } catch(e) {
-          ipcRenderer.send('app:diagnosticLog', 'SSE clone error: ' + e.message);
+      if (isBingSearchUrl(url)) {
+        var headers = headersToObject(init && init.headers ? init.headers : (input && input.headers ? input.headers : undefined));
+        var body = init && Object.prototype.hasOwnProperty.call(init, 'body') ? init.body : undefined;
+        if (body != null && typeof body !== 'string' && !(body instanceof Uint8Array)) {
+          body = String(body);
         }
-        return response;
-      }).catch(function(e) {
-        ipcRenderer.send('app:diagnosticLog', 'SSE fetch error: ' + e.message);
-        throw e;
-      });
-    }
+        return ipcRenderer.invoke('app:fetchBingDiagnostic', {
+          url: url, method: (init && init.method) || (input && input.method) || 'GET',
+          headers: headers, body: body,
+        }).then(function(result) {
+          return new Response(result.bodyText || '', {
+            status: result.status, statusText: result.statusText,
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          });
+        }).catch(function(err) {
+          console.error('[webview-preload] Bing proxy failed:', err.message);
+          throw err;
+        });
+      }
 
-    return nativeFetch(input, init);
-  };
+      // SSE interception: clone the response to stream tokens
+      if (isDeepSeekApiUrl(url) && (url.indexOf('/completion') >= 0 || url.indexOf('/chat') >= 0)) {
+        return innerFetch(input, init).then(function(response) {
+          try {
+            var cloned = response.clone();
+            var reader = cloned.body && cloned.body.getReader ? cloned.body.getReader() : null;
+            if (reader) {
+              var decoder = new TextDecoder(), buf = '';
+              function readStream() {
+                reader.read().then(function(r) {
+                  if (r.done) { ipcRenderer.send('chat:chunk', '__END__'); return; }
+                  buf += decoder.decode(r.value, {stream: true});
+                  var lines = buf.split('\n'); buf = lines.pop() || '';
+                  for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim();
+                    if (!line.startsWith('data: ')) continue;
+                    var data = line.slice(6);
+                    if (data === '[DONE]') { ipcRenderer.send('chat:chunk', '__END__'); return; }
+                    try {
+                      var parsed = JSON.parse(data);
+                      var delta = parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
+                      if (delta && delta.content) ipcRenderer.send('chat:chunk', delta.content);
+                    } catch(_) {}
+                  }
+                  readStream();
+                });
+              }
+              readStream();
+            }
+          } catch(_) {}
+          return response;
+        });
+      }
+
+      return innerFetch(input, init);
+    };
+  }
+
+  Object.defineProperty(globalThis, 'fetch', {
+    get: function() { return _realFetch; },
+    set: function(newFetch) {
+      _realFetch = makeWrapper(newFetch);
+    },
+    configurable: true, enumerable: true
+  });
+  // Set initial wrapper
+  globalThis.fetch = nativeFetch;
 }
 
 // ============================================================
