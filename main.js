@@ -7,6 +7,7 @@ const fs = require('fs');
 const http = require('http');
 const url = require('url');
 const wechatBot = require('./wechat-bot.js');
+const agentRouter = require('./agent-router.js');
 
 let mainWindow = null;
 let tray = null;
@@ -3860,6 +3861,34 @@ function createMiniChat() {
     var mode = (payload && payload.mode) || 'default';
     var images = (payload && payload.images) || [];
     console.log('[MiniChat] ask q=' + (question||'').substring(0,30) + ' mode=' + mode + ' imgs=' + images.length);
+
+    // Agent Router: check if this is a local tool command
+    if (question) {
+      var intents = agentRouter.detectIntent(question);
+      if (intents.length > 0 && intents[0].confidence >= 1.0) {
+        var intent = intents[0];
+        console.log('[Agent] executing local tool:', intent.tool);
+        agentRouter.executeTool(intent.tool, intent.params).then(function(result) {
+          var reply = JSON.stringify(result, null, 2);
+          if (result.success && result.stdout) reply = result.stdout;
+          else if (result.success && result.content) reply = result.content.slice(0, 2000);
+          else if (result.success && result.items) {
+            reply = result.items.map(function(it) {
+              return (it.type === 'dir' ? '[DIR]  ' : '[FILE] ') + it.name;
+            }).join('\n');
+          }
+          if (miniChatWindow && !miniChatWindow.isDestroyed()) {
+            miniChatWindow.webContents.send('mini:replyComplete', reply);
+          }
+        }).catch(function(e) {
+          if (miniChatWindow && !miniChatWindow.isDestroyed()) {
+            miniChatWindow.webContents.send('mini:replyComplete', 'Tool error: ' + e.message);
+          }
+        });
+        return;
+      }
+    }
+
     if (mainWindow && !mainWindow.isDestroyed()) {
       var prevMode = miniChatConversationMode;
       var modeChanged = prevMode && prevMode !== mode;
@@ -4165,7 +4194,9 @@ function createMiniChat() {
           }
           setTimeout(function(){ waitForModeAndPaste(12); }, 800);
         }).toString()
-          .replace("'PLACEHOLDER_Q'", JSON.stringify(question || ''))
+          .replace("'PLACEHOLDER_Q'", JSON.stringify(
+            (modeChanged ? agentRouter.getToolSystemPrompt() + '\nUser: ' : '') + (question || '')
+          ))
           .replace("'PLACEHOLDER_M'", JSON.stringify(mode))
           .replace('IMG_COUNT = 0', 'IMG_COUNT = ' + imageScripts.length)
           .replace('IMG_DATA = []', 'IMG_DATA = ' + JSON.stringify(imageScripts))
