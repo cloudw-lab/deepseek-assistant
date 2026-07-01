@@ -4206,23 +4206,20 @@ function createMiniChat() {
                 }
                 if (send) {
                   var r2 = send.getBoundingClientRect();
-                  if (!send.disabled) {
-                    send.dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
-                    send.dispatchEvent(new MouseEvent("mouseup",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
-                    send.click();
-                  } else {
-                    // Button still disabled - just dispatch events anyway (page might handle it)
-                    send.dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
-                    send.dispatchEvent(new MouseEvent("mouseup",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
-                  }
+                  send.dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
+                  send.dispatchEvent(new MouseEvent("mouseup",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
+                  if (!send.disabled) send.click();
                 }
-                // Also try Enter on textarea directly
+                // Send Enter on textarea + document
                 var ta = document.querySelector("textarea");
                 if (ta) {
                   ta.focus();
                   ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
                   ta.dispatchEvent(new KeyboardEvent("keyup",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
                 }
+                // Also try clicking the entire document/body on the right side (send area)
+                var bodyRect = document.body.getBoundingClientRect();
+                document.body.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window,clientX:bodyRect.right-40,clientY:bodyRect.bottom-80,button:0,buttons:1}));
                 // After attempting send, wait a bit and check if it took effect
                 setTimeout(function(){
                   var newAi = document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");
