@@ -4133,7 +4133,7 @@ function createMiniChat() {
               }
               if (hit && hit.offsetParent) {
                 pointBtn = hit;
-                dbg('point-hit candidate text=', (pointBtn.innerText || pointBtn.textContent || '').trim());
+                dbg('point-hit candidate text=', (pointBtn.innerText || pointBtn.textContent || '').trim(), 'class=', pointBtn.className || '');
               }
             }
             var sBtn=null;
@@ -4234,8 +4234,13 @@ function createMiniChat() {
               return;
             }
             if (retries <= 0) {
-              dbg('mode wait timeout, force paste');
-              pasteImage(0);
+              if (target === "\u5feb\u901f\u6a21\u5f0f") {
+                dbg('mode wait timeout on default mode, force paste');
+                pasteImage(0);
+                return;
+              }
+              dbg('mode not ready yet, extend waiting');
+              setTimeout(function(){ waitForModeAndPaste(12); }, 800);
               return;
             }
             if (retries === 12 || retries === 6 || retries === 1) console.log('[MiniChatInject] waiting mode/textarea retries=', retries, 'ready=', ready, 'ta=', !!ta);
