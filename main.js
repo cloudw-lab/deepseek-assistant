@@ -4126,16 +4126,24 @@ function createMiniChat() {
             }
             var pointBtn = null;
             if (ta0) {
-              var tr = ta0.getBoundingClientRect();
-              var px = Math.max(0, Math.floor(tr.right - 24));
-              var py = Math.max(0, Math.floor(tr.bottom - 24));
-              var hit = document.elementFromPoint(px, py);
-              while (hit && hit.tagName !== 'BUTTON' && hit.getAttribute('role') !== 'button') {
-                hit = hit.parentElement;
-              }
-              if (hit && hit.offsetParent) {
-                pointBtn = hit;
-                dbg('point-hit candidate text=', (pointBtn.innerText || pointBtn.textContent || '').trim(), 'class=', pointBtn.className || '');
+              var baseRect = scope && scope.getBoundingClientRect ? scope.getBoundingClientRect() : ta0.getBoundingClientRect();
+              var hitPoints = [
+                [baseRect.right - 24, baseRect.bottom - 24],
+                [baseRect.right - 48, baseRect.bottom - 24],
+                [baseRect.right - 24, baseRect.bottom - 48],
+                [baseRect.right - 64, baseRect.bottom - 40]
+              ];
+              for (var hp = 0; hp < hitPoints.length && !pointBtn; hp++) {
+                var px = Math.max(0, Math.floor(hitPoints[hp][0]));
+                var py = Math.max(0, Math.floor(hitPoints[hp][1]));
+                var hit = document.elementFromPoint(px, py);
+                while (hit && hit.tagName !== 'BUTTON' && hit.getAttribute('role') !== 'button') {
+                  hit = hit.parentElement;
+                }
+                if (hit && hit.offsetParent) {
+                  pointBtn = hit;
+                  dbg('point-hit candidate text=', (pointBtn.innerText || pointBtn.textContent || '').trim(), 'class=', pointBtn.className || '', 'at=', px + ',' + py);
+                }
               }
             }
             var sBtn=null;
@@ -4169,7 +4177,8 @@ function createMiniChat() {
             }
             if(sBtn){
               var ariaDisabled=(sBtn.getAttribute("aria-disabled")||"").toLowerCase()==='true';
-              dbg('send candidate text=', (sBtn.innerText || sBtn.textContent || '').trim(), 'disabled=', !!sBtn.disabled, 'ariaDisabled=', ariaDisabled, 'score=', bestScore);
+              var sr = sBtn.getBoundingClientRect();
+              dbg('send candidate text=', (sBtn.innerText || sBtn.textContent || '').trim(), 'class=', sBtn.className || '', 'disabled=', !!sBtn.disabled, 'ariaDisabled=', ariaDisabled, 'score=', bestScore, 'rect=', [Math.round(sr.left),Math.round(sr.top),Math.round(sr.width),Math.round(sr.height)].join(','));
               if(sBtn.disabled || ariaDisabled){
                 if(retries > 0) {
                   if (ta0) {
