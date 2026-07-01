@@ -9,6 +9,54 @@ const url = require('url');
 const wechatBot = require('./wechat-bot.js');
 const agentRouter = require('./agent-router.js');
 
+// Agent loop: detect tool calls in AI response, execute, feed results back
+function runAgentLoop(answer, wcid) {
+  if (!answer || !wcid) return;
+  var intents = agentRouter.detectIntent(answer);
+  if (intents.length === 0 || intents[0].confidence < 1.0) return;
+
+  var intent = intents[0];
+  console.log('[Agent Loop] detected tool call:', intent.tool);
+  agentRouter.executeTool(intent.tool, intent.params).then(function(result) {
+    var toolResult = JSON.stringify(result);
+    if (result.success && result.stdout) toolResult = result.stdout.slice(0, 3000);
+    else if (result.success && result.content) toolResult = result.content.slice(0, 3000);
+    else if (result.success && result.items) {
+      toolResult = result.items.map(function(it) {
+        return (it.type === 'dir' ? '[DIR]  ' : '[FILE] ') + it.name;
+      }).join('\n');
+    }
+
+    var toolMsg = '\n\n[Tool Result: ' + intent.tool + ']\n' + toolResult;
+    if (miniChatWindow && !miniChatWindow.isDestroyed()) {
+      miniChatWindow.webContents.send('mini:replyComplete', toolMsg);
+    }
+
+    // Feed tool result back to the webview conversation
+    try {
+      var wc = require('electron').webContents.fromId(wcid);
+      if (wc && !wc.isDestroyed()) {
+        wc.executeJavaScript(
+          '(function(){' +
+          'var ta=document.querySelector("textarea");if(!ta)return;' +
+          'var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;' +
+          'ns.call(ta,"");ns.call(ta,' + JSON.stringify(toolMsg.trim()) + ');ta.focus();' +
+          'ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:' + JSON.stringify(toolMsg.trim()) + '}));' +
+          'ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:' + JSON.stringify(toolMsg.trim()) + '}));' +
+          'ta.dispatchEvent(new Event("change",{bubbles:true}));' +
+          'var btns=document.querySelectorAll("button");var sBtn=null;' +
+          'for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();if(cls.indexOf("send")>=0){sBtn=b;break;}}' +
+          'if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}' +
+          'ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));' +
+          '})()'
+        ).catch(function(){});
+      }
+    } catch(_) {}
+  }).catch(function(e) {
+    console.log('[Agent Loop] tool error:', e.message);
+  });
+}
+
 let mainWindow = null;
 let tray = null;
 let httpServer = null;
@@ -4236,6 +4284,8 @@ function createMiniChat() {
                 clearInterval(miniChatPollTimer); miniChatPollTimer = null;
                 var answer = lastText.replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
                 miniChatWindow.webContents.send('mini:replyComplete', answer);
+                // Agent loop: check if AI response calls for local tool execution
+                runAgentLoop(answer, wcid);
               }
               if (attempts > 90 && lastText.length === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
                 clearInterval(miniChatPollTimer); miniChatPollTimer = null;
