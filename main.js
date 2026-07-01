@@ -4260,6 +4260,8 @@ function createMiniChat() {
           .replace('IMG_COUNT = 0', 'IMG_COUNT = ' + imageScripts.length)
           .replace('IMG_DATA = []', 'IMG_DATA = ' + JSON.stringify(imageScripts))
           + ')()';
+        sseActive = false;
+        try { wc.send('chat:stream:start'); } catch (_) {}
         wc.executeJavaScript(code);
 
         // Start polling if text or images were sent
@@ -4300,10 +4302,12 @@ function createMiniChat() {
                   // Agent loop: check if AI response calls for local tool execution
                   runAgentLoop(answer, wcid);
                 }
+                try { pw.send('chat:stream:stop'); } catch (_) {}
               }
               if (attempts > 90 && lastText.length === 0 && miniChatWindow && !miniChatWindow.isDestroyed()) {
                 clearInterval(miniChatPollTimer); miniChatPollTimer = null;
                 miniChatWindow.webContents.send('mini:reply', '\u672a\u83b7\u53d6\u5230\u56de\u590d\uff0c\u8bf7\u68c0\u67e5\u4e3b\u7a97\u53e3');
+                try { pw.send('chat:stream:stop'); } catch (_) {}
               }
             }).catch(function(e){});
           } catch(_) {}
@@ -4334,6 +4338,14 @@ function createMiniChat() {
 
   ipcMain.on('mini:close', function() {
     if (miniChatPollTimer) { clearInterval(miniChatPollTimer); miniChatPollTimer = null; }
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.executeJavaScript('(function(){var cv=document.getElementById("chatView");return cv?cv.getWebContentsId():-1})()').then(function(wcid){
+          var pw = require('electron').webContents.fromId(wcid);
+          if (pw && !pw.isDestroyed()) pw.send('chat:stream:stop');
+        }).catch(function(){});
+      }
+    } catch(_) {}
     if (miniChatWindow) { miniChatWindow.close(); miniChatWindow = null; }
   });
 
@@ -4350,6 +4362,11 @@ function createMiniChat() {
     if (chunk === '__END__') {
       miniChatWindow.webContents.send('mini:replyComplete', '');
       sseActive = false;
+      return;
+    }
+    if (typeof chunk === 'string' && chunk.indexOf('__RESET__') === 0) {
+      miniChatWindow.webContents.send('mini:replyComplete', chunk.slice('__RESET__'.length));
+      sseActive = true;
       return;
     }
     sseActive = true;

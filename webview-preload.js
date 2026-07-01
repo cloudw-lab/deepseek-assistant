@@ -90,83 +90,109 @@ function decodeBase64ToUint8Array(base64) {
 }
 
 // ============================================================
-// Fetch interceptor - survives main-world.js override via defineProperty
+// Fetch wrapper (only Bing proxy) + DOM stream observer for DeepSeek replies
 // ============================================================
 if (nativeFetch) {
-  var _realFetch = nativeFetch;
+  globalThis.fetch = function(input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
 
-  function makeWrapper(innerFetch) {
-    return function(input, init) {
-      var url = typeof input === 'string' ? input : (input && input.url) || '';
-
-      if (isBingSearchUrl(url)) {
-        var headers = headersToObject(init && init.headers ? init.headers : (input && input.headers ? input.headers : undefined));
-        var body = init && Object.prototype.hasOwnProperty.call(init, 'body') ? init.body : undefined;
-        if (body != null && typeof body !== 'string' && !(body instanceof Uint8Array)) {
-          body = String(body);
-        }
-        return ipcRenderer.invoke('app:fetchBingDiagnostic', {
-          url: url, method: (init && init.method) || (input && input.method) || 'GET',
-          headers: headers, body: body,
-        }).then(function(result) {
-          return new Response(result.bodyText || '', {
-            status: result.status, statusText: result.statusText,
-            headers: { 'content-type': 'text/html; charset=utf-8' },
-          });
-        }).catch(function(err) {
-          console.error('[webview-preload] Bing proxy failed:', err.message);
-          throw err;
-        });
+    if (isBingSearchUrl(url)) {
+      var headers = headersToObject(init && init.headers ? init.headers : (input && input.headers ? input.headers : undefined));
+      var body = init && Object.prototype.hasOwnProperty.call(init, 'body') ? init.body : undefined;
+      if (body != null && typeof body !== 'string' && !(body instanceof Uint8Array)) {
+        body = String(body);
       }
-
-      // SSE interception: clone the response to stream tokens
-      if (isDeepSeekApiUrl(url) && (url.indexOf('/completion') >= 0 || url.indexOf('/chat') >= 0)) {
-        return innerFetch(input, init).then(function(response) {
-          try {
-            var cloned = response.clone();
-            var reader = cloned.body && cloned.body.getReader ? cloned.body.getReader() : null;
-            if (reader) {
-              var decoder = new TextDecoder(), buf = '';
-              function readStream() {
-                reader.read().then(function(r) {
-                  if (r.done) { ipcRenderer.send('chat:chunk', '__END__'); return; }
-                  buf += decoder.decode(r.value, {stream: true});
-                  var lines = buf.split('\n'); buf = lines.pop() || '';
-                  for (var i = 0; i < lines.length; i++) {
-                    var line = lines[i].trim();
-                    if (!line.startsWith('data: ')) continue;
-                    var data = line.slice(6);
-                    if (data === '[DONE]') { ipcRenderer.send('chat:chunk', '__END__'); return; }
-                    try {
-                      var parsed = JSON.parse(data);
-                      var delta = parsed.choices && parsed.choices[0] && parsed.choices[0].delta;
-                      if (delta && delta.content) ipcRenderer.send('chat:chunk', delta.content);
-                    } catch(_) {}
-                  }
-                  readStream();
-                });
-              }
-              readStream();
-            }
-          } catch(_) {}
-          return response;
+      return ipcRenderer.invoke('app:fetchBingDiagnostic', {
+        url: url, method: (init && init.method) || (input && input.method) || 'GET',
+        headers: headers, body: body,
+      }).then(function(result) {
+        return new Response(result.bodyText || '', {
+          status: result.status, statusText: result.statusText,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
         });
-      }
+      }).catch(function(err) {
+        console.error('[webview-preload] Bing proxy failed:', err.message);
+        throw err;
+      });
+    }
 
-      return innerFetch(input, init);
-    };
-  }
-
-  Object.defineProperty(globalThis, 'fetch', {
-    get: function() { return _realFetch; },
-    set: function(newFetch) {
-      _realFetch = makeWrapper(newFetch);
-    },
-    configurable: true, enumerable: true
-  });
-  // Set initial wrapper
-  globalThis.fetch = nativeFetch;
+    return nativeFetch(input, init);
+  };
 }
+
+var __miniStreamObserver = null;
+var __miniLastText = '';
+var __miniIdleTimer = null;
+
+function extractLatestAssistantText() {
+  try {
+    var roots = document.querySelectorAll('._74c0879, .ds-assistant-message-main-content');
+    if (!roots.length) return '';
+    var r = roots[roots.length - 1].cloneNode(true);
+    var nodes = r.querySelectorAll('.dpp-tool-block,.dpp-agent-container');
+    for (var i = 0; i < nodes.length; i++) nodes[i].remove();
+    return (r.textContent || '').trim();
+  } catch (_) { return ''; }
+}
+
+function resetMiniStreamState() {
+  __miniLastText = '';
+  if (__miniIdleTimer) {
+    clearTimeout(__miniIdleTimer);
+    __miniIdleTimer = null;
+  }
+}
+
+function scheduleMiniStreamEnd() {
+  if (__miniIdleTimer) clearTimeout(__miniIdleTimer);
+  __miniIdleTimer = setTimeout(function() {
+    resetMiniStreamState();
+    ipcRenderer.send('chat:chunk', '__END__');
+  }, 1200);
+}
+
+function emitMiniStreamUpdate() {
+  var text = extractLatestAssistantText();
+  if (!text) return;
+  if (text === __miniLastText) {
+    scheduleMiniStreamEnd();
+    return;
+  }
+  if (__miniLastText && text.indexOf(__miniLastText) === 0) {
+    var delta = text.slice(__miniLastText.length);
+    if (delta) ipcRenderer.send('chat:chunk', delta);
+  } else {
+    ipcRenderer.send('chat:chunk', '__RESET__' + text);
+  }
+  __miniLastText = text;
+  scheduleMiniStreamEnd();
+}
+
+function startMiniStreamObserver() {
+  stopMiniStreamObserver();
+  resetMiniStreamState();
+  if (!document.body) return;
+  __miniStreamObserver = new MutationObserver(function() {
+    emitMiniStreamUpdate();
+  });
+  __miniStreamObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+
+function stopMiniStreamObserver() {
+  if (__miniStreamObserver) {
+    __miniStreamObserver.disconnect();
+    __miniStreamObserver = null;
+  }
+  resetMiniStreamState();
+}
+
+ipcRenderer.on('chat:stream:start', function() {
+  startMiniStreamObserver();
+});
+
+ipcRenderer.on('chat:stream:stop', function() {
+  stopMiniStreamObserver();
+});
 
 // ============================================================
 // Storage (内存缓存 + IPC 持久化)
