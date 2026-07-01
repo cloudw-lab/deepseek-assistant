@@ -4192,12 +4192,12 @@ function createMiniChat() {
                 if (ae && ae !== document.body) {
                   ae.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
                 }
-                // Try clicking a small enabled button (likely send)
+                // Try clicking a small button (even if disabled - might become enabled)
                 var btns = document.querySelectorAll("button,[role=button]");
                 var send = null;
                 for (var i=btns.length-1; i>=0; i--) {
                   var b = btns[i];
-                  if (!b.offsetParent || b.disabled) continue;
+                  if (!b.offsetParent) continue;
                   var r = b.getBoundingClientRect();
                   if (r.width > 0 && r.height > 0 && r.width < 100 && r.height < 60) {
                     send = b;
@@ -4209,6 +4209,13 @@ function createMiniChat() {
                   send.dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
                   send.dispatchEvent(new MouseEvent("mouseup",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
                   send.click();
+                }
+                // Also try Enter on textarea directly
+                var ta = document.querySelector("textarea");
+                if (ta) {
+                  ta.focus();
+                  ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
+                  ta.dispatchEvent(new KeyboardEvent("keyup",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
                 }
                 // After attempting send, wait a bit and check if it took effect
                 setTimeout(function(){
