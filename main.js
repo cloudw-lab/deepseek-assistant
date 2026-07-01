@@ -4204,11 +4204,17 @@ function createMiniChat() {
                     break;
                   }
                 }
-                if (send && !send.disabled) {
+                if (send) {
                   var r2 = send.getBoundingClientRect();
-                  send.dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
-                  send.dispatchEvent(new MouseEvent("mouseup",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
-                  send.click();
+                  if (!send.disabled) {
+                    send.dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
+                    send.dispatchEvent(new MouseEvent("mouseup",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
+                    send.click();
+                  } else {
+                    // Button still disabled - just dispatch events anyway (page might handle it)
+                    send.dispatchEvent(new MouseEvent("mousedown",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
+                    send.dispatchEvent(new MouseEvent("mouseup",{bubbles:true,cancelable:true,view:window,clientX:r2.left+r2.width/2,clientY:r2.top+r2.height/2,button:0,buttons:1}));
+                  }
                 }
                 // Also try Enter on textarea directly
                 var ta = document.querySelector("textarea");
