@@ -4077,7 +4077,8 @@ function createMiniChat() {
           }
           function clickSendWhenReady(retries, allowFormSubmit) {
             var bodyText = (document.body && (document.body.innerText || document.body.textContent) || '').trim();
-            if (bodyText.indexOf('\u6587\u4ef6\u89e3\u6790\u4e2d') >= 0 || bodyText.indexOf('\u89e3\u6790\u4e2d') >= 0 || bodyText.indexOf('\u4e0a\u4f20\u4e2d') >= 0 || bodyText.indexOf('\u5904\u7406\u4e2d') >= 0) {
+            if (bodyText.indexOf('\u6587\u4ef6\u89e3\u6790\u4e2d') >= 0 || bodyText.indexOf('\u89e3\u6790\u4e2d') >= 0 || bodyText.indexOf('\u4e0a\u4f20\u4e2d') >= 0 || bodyText.indexOf('\u5904\u7406\u4e2d') >= 0 || bodyText.indexOf('\u4e0a\u4f20\u56fe\u7247') >= 0 || bodyText.indexOf('\u56fe\u7247\u89e3\u6790') >= 0 || bodyText.indexOf('\u8bc6\u522b\u4e2d') >= 0) {
+              dbg('still parsing/uploading, wait retries=', retries);
               if (retries > 0) {
                 setTimeout(function(){ clickSendWhenReady(retries - 1, allowFormSubmit); }, 500);
               }
@@ -4186,7 +4187,6 @@ function createMiniChat() {
               ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:Q}));
               ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:Q}));
               ta.dispatchEvent(new Event("change",{bubbles:true}));
-              ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));
             }
             if (!Q && IMG_COUNT > 0) {
               clickSendWhenReady(200, false);
