@@ -4122,8 +4122,26 @@ function createMiniChat() {
             } else {
               candidates = document.querySelectorAll("button,[role=button]");
             }
+            var pointBtn = null;
+            if (ta0) {
+              var tr = ta0.getBoundingClientRect();
+              var px = Math.max(0, Math.floor(tr.right - 24));
+              var py = Math.max(0, Math.floor(tr.bottom - 24));
+              var hit = document.elementFromPoint(px, py);
+              while (hit && hit.tagName !== 'BUTTON' && hit.getAttribute('role') !== 'button') {
+                hit = hit.parentElement;
+              }
+              if (hit && hit.offsetParent) {
+                pointBtn = hit;
+                dbg('point-hit candidate text=', (pointBtn.innerText || pointBtn.textContent || '').trim());
+              }
+            }
             var sBtn=null;
             var bestScore = -Infinity;
+            if (pointBtn) {
+              sBtn = pointBtn;
+              bestScore = 5000;
+            }
             for(var i=0;i<candidates.length;i++){
               var b=candidates[i];
               var rect=b.getBoundingClientRect();
