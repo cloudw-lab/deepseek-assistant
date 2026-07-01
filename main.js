@@ -3834,7 +3834,7 @@ function createMiniChat() {
         if (lastAi && !lastAi.classList.contains('complete')) {
           var cur = lastAi.innerHTML;
           // Strip trailing cursor
-          cur = cur.replace(/<span class="cursor">\|<\/span>$/, '');
+          cur = cur.replace(/<span class="cursor">\\|\\<\\/span>$/, '');
           lastAi.innerHTML = cur + text.replace(/</g,'&lt;') + '<span class="cursor">|</span>';
         } else {
           msgs.innerHTML += '<div class="msg ai">' + text.replace(/</g,'&lt;') + '<span class="cursor">|</span></div>';
@@ -3853,7 +3853,7 @@ function createMiniChat() {
           lastAi.classList.add('complete');
         } else if (lastAi) {
           // SSE stream ended, remove cursor
-          lastAi.innerHTML = lastAi.innerHTML.replace(/<span class="cursor">\|<\/span>$/, '');
+          lastAi.innerHTML = lastAi.innerHTML.replace(/<span class="cursor">\\|\\<\\/span>$/, '');
           lastAi.classList.add('complete');
         }
         msgs.scrollTop = msgs.scrollHeight;
