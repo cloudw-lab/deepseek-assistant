@@ -4140,7 +4140,7 @@ function createMiniChat() {
               }
               var r=sBtn.getBoundingClientRect();
               console.log('[MiniChatInject] clicking send button');
-              ['mousedown','mouseup','click'].forEach(function(type){
+              ['mousedown','mouseup'].forEach(function(type){
                 sBtn.dispatchEvent(new MouseEvent(type,{
                   bubbles:true,cancelable:true,view:window,
                   clientX:r.left+r.width/2,clientY:r.top+r.height/2,
