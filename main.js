@@ -4007,6 +4007,8 @@ function createMiniChat() {
           }
           function modeReady() {
             if (target === "\u5feb\u901f\u6a21\u5f0f") return true;
+            var pageText = (document.body && (document.body.innerText || document.body.textContent) || '').trim();
+            if (pageText.indexOf('\u4f7f\u7528' + target + '\u5f00\u59cb\u5bf9\u8bdd') >= 0) return true;
             if (chosenModeEl && isSelected(chosenModeEl)) return true;
             return false;
           }
