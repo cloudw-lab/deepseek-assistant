@@ -4158,14 +4158,16 @@ function createMiniChat() {
               }
               var r=sBtn.getBoundingClientRect();
               dbg('clicking send button');
-              ['mousedown','mouseup'].forEach(function(type){
-                sBtn.dispatchEvent(new MouseEvent(type,{
-                  bubbles:true,cancelable:true,view:window,
-                  clientX:r.left+r.width/2,clientY:r.top+r.height/2,
-                  button:0,buttons:1
-                }));
-              });
-              if(typeof sBtn.click === 'function') sBtn.click();
+              setTimeout(function(){
+                ['mousedown','mouseup'].forEach(function(type){
+                  sBtn.dispatchEvent(new MouseEvent(type,{
+                    bubbles:true,cancelable:true,view:window,
+                    clientX:r.left+r.width/2,clientY:r.top+r.height/2,
+                    button:0,buttons:1
+                  }));
+                });
+                if(typeof sBtn.click === 'function') sBtn.click();
+              }, (M === 'vision' || M === 'VISION') ? 300 : 0);
               return;
             }
             dbg('no send candidate, retries=', retries);
