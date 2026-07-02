@@ -292,13 +292,15 @@ function startReplyPolling(opts) {
       if (!initDone) {
         initialMsgCount = count;
         initDone = true;
-        if (attempts < 5) { timerRef.timer = setTimeout(poll, 2000); return; }
+        // Immediately schedule next poll to start checking
+        timerRef.timer = setTimeout(poll, 800);
+        return;
       }
 
       // Skip stale messages (pre-existing before this question)
       if (count <= initialMsgCount) {
         if (attempts > 80) onTimeout();
-        timerRef.timer = setTimeout(poll, 2000);
+  timerRef.timer = setTimeout(poll, 200);
         return;
       }
 
