@@ -8,26 +8,17 @@ const http = require('http');
 const url = require('url');
 const wechatBot = require('./wechat-bot.js');
 const agentRouter = require('./agent-router.js');
+const agentCore = require('./agent-core.js');
+const deepseekWebDriver = require('./deepseek-web-driver.js');
+const protocol = require('./tool-protocol.js');
 
 // Agent loop: detect tool calls in AI response, execute, feed results back
 function runAgentLoop(answer, wcid) {
   if (!answer || !wcid) return;
-  var intents = agentRouter.detectIntent(answer);
-  if (intents.length === 0 || intents[0].confidence < 1.0) return;
-
-  var intent = intents[0];
-  console.log('[Agent Loop] detected tool call:', intent.tool);
-  agentRouter.executeTool(intent.tool, intent.params).then(function(result) {
-    var toolResult = JSON.stringify(result);
-    if (result.success && result.stdout) toolResult = result.stdout.slice(0, 3000);
-    else if (result.success && result.content) toolResult = result.content.slice(0, 3000);
-    else if (result.success && result.items) {
-      toolResult = result.items.map(function(it) {
-        return (it.type === 'dir' ? '[DIR]  ' : '[FILE] ') + it.name;
-      }).join('\n');
-    }
-
-    var toolMsg = '\n\n[Tool Result: ' + intent.tool + ']\n' + toolResult;
+  agentCore.maybeExecuteToolCall(answer).then(function(execResult) {
+    if (!execResult) return;
+    console.log('[Agent Loop] detected tool call:', execResult.tool);
+    var toolMsg = '\n\n' + agentCore.buildToolResultMessage(execResult);
     if (miniChatWindow && !miniChatWindow.isDestroyed()) {
       miniChatWindow.webContents.send('mini:replyComplete', toolMsg);
     }
@@ -3929,11 +3920,10 @@ function createMiniChat() {
 
     // Agent Router: check if this is a local tool command
     if (question) {
-      var intents = agentRouter.detectIntent(question);
-      if (intents.length > 0 && intents[0].confidence >= 1.0) {
-        var intent = intents[0];
+      var intent = agentCore.detectDirectLocalIntent(question);
+      if (intent) {
         console.log('[Agent] executing local tool:', intent.tool);
-        agentRouter.executeTool(intent.tool, intent.params).then(function(result) {
+        agentCore.executeDirectLocalIntent(intent).then(function(result) {
           var reply = JSON.stringify(result, null, 2);
           if (result.success && result.stdout) reply = result.stdout;
           else if (result.success && result.content) reply = result.content.slice(0, 2000);
@@ -3960,9 +3950,7 @@ function createMiniChat() {
       miniChatConversationMode = mode;
       if (modeChanged) miniChatToolPromptInjected = false;
       // Get webview's webContentsId, then inject and poll directly
-      setTimeout(function(){ mainWindow.webContents.executeJavaScript(
-        '(function(){var cv=document.getElementById("chatView");return cv?cv.getWebContentsId():-1})()'
-      ).then(function(wcid) {
+      setTimeout(function(){ deepseekWebDriver.getChatWebContentsId(mainWindow).then(function(wcid) {
         if (wcid <= 0) {
           console.log('[MiniChat] no chatView webContents');
           if (miniChatWindow) miniChatWindow.webContents.send('mini:reply', '主窗口未就绪');
@@ -3976,6 +3964,66 @@ function createMiniChat() {
         }
         function continueInject() {
         console.log('[MiniChat] wcid=' + wcid + ' injecting question');
+
+        // Reasonix-style split: use driver/core modules instead of inline driver logic.
+        var fs = require('fs');
+        var imageScripts = [];
+        if (images.length > 0) {
+          images.forEach(function(imgPath) {
+            try {
+              var ext = require('path').extname(imgPath).toLowerCase();
+              var mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
+              var b64 = fs.readFileSync(imgPath).toString('base64');
+              imageScripts.push({ b64: b64, mime: mime });
+            } catch (_) {}
+          });
+        }
+        if (miniChatDiagTimer) { clearInterval(miniChatDiagTimer); miniChatDiagTimer = null; }
+        var injectedQuestion = agentCore.buildUserPrompt(question || '', !miniChatToolPromptInjected);
+        miniChatToolPromptInjected = true;
+        var code = deepseekWebDriver.buildInjectedTurnCode({
+          question: injectedQuestion,
+          mode: mode,
+          imageScripts: imageScripts,
+        });
+        sseActive = false;
+        deepseekWebDriver.startDomStream(wc);
+        wc.executeJavaScript(code);
+        miniChatDiagTimer = setInterval(function() {
+          var live = require('electron').webContents.fromId(wcid);
+          if (!live || live.isDestroyed()) {
+            clearInterval(miniChatDiagTimer);
+            miniChatDiagTimer = null;
+            return;
+          }
+          live.executeJavaScript('(function(){var d=window.__miniDiag||[];window.__miniDiag=[];return d;})()')
+            .then(function(list) {
+              if (Array.isArray(list) && list.length) {
+                list.forEach(function(line) { console.log('[MiniChatInject]', line); });
+              }
+            })
+            .catch(function() {});
+        }, 500);
+        if (!question && images.length === 0) { return; }
+        if (miniChatPollTimer) { clearInterval(miniChatPollTimer); miniChatPollTimer = null; }
+        var pollRef = deepseekWebDriver.startReplyPolling({
+          wcid: wcid,
+          miniChatWindow: miniChatWindow,
+          onFinal: function(text) {
+            var answer = protocol.extractFinalAnswer(text).replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
+            miniChatWindow.webContents.send('mini:replyComplete', answer);
+            runAgentLoop(answer, wcid);
+          },
+          onTimeout: function() {
+            miniChatWindow.webContents.send('mini:reply', '\u672a\u83b7\u53d6\u5230\u56de\u590d\uff0c\u8bf7\u68c0\u67e5\u4e3b\u7a97\u53e3');
+          },
+          onDebugStop: function(pw) {
+            if (miniChatDiagTimer) { clearInterval(miniChatDiagTimer); miniChatDiagTimer = null; }
+            deepseekWebDriver.stopDomStream(pw);
+          }
+        });
+        miniChatPollTimer = pollRef.timer;
+        return;
 
         // Build a single combined script
         var fs = require('fs');
@@ -4359,14 +4407,7 @@ function createMiniChat() {
         }
         if (modeChanged) {
           console.log('[MiniChat] mode changed ' + prevMode + ' -> ' + mode + ', starting new conversation');
-          wc.executeJavaScript(
-            '(function(){' +
-            'var btn=document.querySelector("[aria-label=\\"New chat\\"], [aria-label=\\"新对话\\"]");' +
-            'if(!btn){var as=document.querySelectorAll("a");for(var i=0;i<as.length;i++){if(as[i].href&&as[i].href.indexOf("/chat")>=0&&!as[i].href.includes("/s/")){btn=as[i];break;}}}' +
-            'if(btn)btn.click();' +
-            'else{window.location.href="https://chat.deepseek.com/";}' +
-            '})()'
-          ).catch(function(e){ console.log('[MiniChat] new chat click failed:', e.message); }).finally(function(){
+          deepseekWebDriver.startNewConversation(wc).catch(function(e){ console.log('[MiniChat] new chat click failed:', e.message); }).finally(function(){
             setTimeout(continueInject, 1200);
           });
         } else {
