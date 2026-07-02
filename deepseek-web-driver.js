@@ -311,6 +311,26 @@ function startReplyPolling(opts) {
 
       console.log('[Poll#' + attempts + '] NEW count=' + count + ' text=' + (text||'').slice(0,80));
 
+      // If text contains thinking/thought block, try to extract the real answer
+      if (text.indexOf('已思考') === 0 || text.indexOf('正在思考') === 0 || text.indexOf('已执行工具') === 0) {
+        var lines = text.split('\n');
+        var cut = -1;
+        for (var j = 0; j < lines.length; j++) {
+          if (/^(已思考|正在思考|已执行工具|Step\s*\d+|Agent\s*完成)/.test(lines[j].trim())) {
+            cut = j;
+          }
+        }
+        if (cut >= 0 && cut < lines.length - 1) {
+          text = lines.slice(cut + 1).join('\n').trim();
+        } else {
+          // No real answer yet, keep waiting
+          lastText = '';
+          stable = 0;
+          timerRef.timer = setTimeout(poll, 2000);
+          return;
+        }
+      }
+
       if (text && text.length > 30 && text === lastText) stable++;
       else if (text && text.length > 30) { lastText = text; stable = 0; }
       if ((stable >= 4 || attempts > 60) && lastText.length > 10) {
