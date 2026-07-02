@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 function getChatWebContentsId(mainWindow) {
   return mainWindow.webContents.executeJavaScript(
     '(function(){var cv=document.getElementById("chatView");return cv?cv.getWebContentsId():-1})()'
@@ -205,6 +208,39 @@ function stopDomStream(wc) {
   try { wc.send('chat:stream:stop'); } catch (_) {}
 }
 
+function buildImageScripts(images) {
+  var list = [];
+  (Array.isArray(images) ? images : []).forEach(function(imgPath) {
+    try {
+      var ext = path.extname(imgPath).toLowerCase();
+      var mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
+      var b64 = fs.readFileSync(imgPath).toString('base64');
+      list.push({ b64: b64, mime: mime });
+    } catch (_) {}
+  });
+  return list;
+}
+
+function startDiagPull(opts) {
+  var wcid = opts.wcid;
+  var onLine = opts.onLine;
+  var timer = setInterval(function() {
+    var live = require('electron').webContents.fromId(wcid);
+    if (!live || live.isDestroyed()) {
+      clearInterval(timer);
+      return;
+    }
+    live.executeJavaScript('(function(){var d=window.__miniDiag||[];window.__miniDiag=[];return d;})()')
+      .then(function(list) {
+        if (Array.isArray(list) && list.length && typeof onLine === 'function') {
+          list.forEach(function(line) { onLine(line); });
+        }
+      })
+      .catch(function() {});
+  }, 500);
+  return timer;
+}
+
 function startReplyPolling(opts) {
   var wcid = opts.wcid;
   var miniChatWindow = opts.miniChatWindow;
@@ -260,5 +296,7 @@ module.exports = {
   buildInjectedTurnCode,
   startDomStream,
   stopDomStream,
+  buildImageScripts,
+  startDiagPull,
   startReplyPolling,
 };

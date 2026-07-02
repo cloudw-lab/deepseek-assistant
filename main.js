@@ -3930,18 +3930,7 @@ function createMiniChat() {
         console.log('[MiniChat] wcid=' + wcid + ' injecting question');
 
         // Reasonix-style split: use driver/core modules instead of inline driver logic.
-        var fs = require('fs');
-        var imageScripts = [];
-        if (images.length > 0) {
-          images.forEach(function(imgPath) {
-            try {
-              var ext = require('path').extname(imgPath).toLowerCase();
-              var mime = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
-              var b64 = fs.readFileSync(imgPath).toString('base64');
-              imageScripts.push({ b64: b64, mime: mime });
-            } catch (_) {}
-          });
-        }
+        var imageScripts = deepseekWebDriver.buildImageScripts(images);
         if (miniChatDiagTimer) { clearInterval(miniChatDiagTimer); miniChatDiagTimer = null; }
         var injectedQuestion = agentCore.buildUserPrompt(question || '', !miniChatToolPromptInjected);
         miniChatToolPromptInjected = true;
@@ -3953,21 +3942,10 @@ function createMiniChat() {
         sseActive = false;
         deepseekWebDriver.startDomStream(wc);
         wc.executeJavaScript(code);
-        miniChatDiagTimer = setInterval(function() {
-          var live = require('electron').webContents.fromId(wcid);
-          if (!live || live.isDestroyed()) {
-            clearInterval(miniChatDiagTimer);
-            miniChatDiagTimer = null;
-            return;
-          }
-          live.executeJavaScript('(function(){var d=window.__miniDiag||[];window.__miniDiag=[];return d;})()')
-            .then(function(list) {
-              if (Array.isArray(list) && list.length) {
-                list.forEach(function(line) { console.log('[MiniChatInject]', line); });
-              }
-            })
-            .catch(function() {});
-        }, 500);
+        miniChatDiagTimer = deepseekWebDriver.startDiagPull({
+          wcid: wcid,
+          onLine: function(line) { console.log('[MiniChatInject]', line); }
+        });
         if (!question && images.length === 0) { return; }
         if (miniChatPollTimer) { clearInterval(miniChatPollTimer); miniChatPollTimer = null; }
         var pollRef = deepseekWebDriver.startReplyPolling({
