@@ -4322,13 +4322,11 @@ function createMiniChat() {
               }
               if ((stable >= 4 || attempts > 60) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
                 clearInterval(miniChatPollTimer); miniChatPollTimer = null;
-                // Only send polling result if SSE hasn't delivered content
-                if (!sseActive) {
-                  var answer = lastText.replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
-                  miniChatWindow.webContents.send('mini:replyComplete', answer);
-                  // Agent loop: check if AI response calls for local tool execution
-                  runAgentLoop(answer, wcid);
-                }
+                // Always send the final stable answer, even if SSE streamed partial content.
+                var answer = lastText.replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
+                miniChatWindow.webContents.send('mini:replyComplete', answer);
+                // Agent loop: check if AI response calls for local tool execution
+                runAgentLoop(answer, wcid);
                 if (miniChatDiagTimer) { clearInterval(miniChatDiagTimer); miniChatDiagTimer = null; }
                 try { pw.send('chat:stream:stop'); } catch (_) {}
               }
