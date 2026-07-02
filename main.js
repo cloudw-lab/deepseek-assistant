@@ -3634,6 +3634,7 @@ let miniChatPollTimer = null;
 let miniChatConversationMode = null;
 let sseActive = false;
 let miniChatDiagTimer = null;
+let miniChatToolPromptInjected = false;
 
 function triggerMainChatNewConversation() {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -3904,6 +3905,7 @@ function createMiniChat() {
   ipcMain.on('mini:newchat', function() {
     triggerMainChatNewConversation();
     miniChatConversationMode = null;
+    miniChatToolPromptInjected = false;
   });
 
   ipcMain.on('mini:ask', function(_, payload) {
@@ -3943,6 +3945,7 @@ function createMiniChat() {
       var prevMode = miniChatConversationMode;
       var modeChanged = prevMode && prevMode !== mode;
       miniChatConversationMode = mode;
+      if (modeChanged) miniChatToolPromptInjected = false;
       // Get webview's webContentsId, then inject and poll directly
       setTimeout(function(){ mainWindow.webContents.executeJavaScript(
         '(function(){var cv=document.getElementById("chatView");return cv?cv.getWebContentsId():-1})()'
@@ -3978,6 +3981,8 @@ function createMiniChat() {
 
         if (miniChatDiagTimer) { clearInterval(miniChatDiagTimer); miniChatDiagTimer = null; }
         // Build injected code: mode switch → paste images → type text → send
+        var toolPromptPrefix = miniChatToolPromptInjected ? '' : (agentRouter.getToolSystemPrompt() + '\nUser: ');
+        miniChatToolPromptInjected = true;
         var code = '(' + (function(){
           window.__miniDiag = [];
           function dbg() {
@@ -4261,7 +4266,7 @@ function createMiniChat() {
           setTimeout(function(){ waitForModeAndPaste(12); }, 800);
         }).toString()
           .replace("'PLACEHOLDER_Q'", JSON.stringify(
-            (modeChanged ? agentRouter.getToolSystemPrompt() + '\nUser: ' : '') + (question || '')
+            toolPromptPrefix + (question || '')
           ))
           .replace("'PLACEHOLDER_M'", JSON.stringify(mode))
           .replace('IMG_COUNT = 0', 'IMG_COUNT = ' + imageScripts.length)
