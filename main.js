@@ -3834,6 +3834,16 @@ function createMiniChat() {
         if (text === '__STREAM_END__' || text === '__END__') return;
         var msgs = document.getElementById('msgs');
         var lastAi = msgs.querySelector('.msg.ai:last-child');
+        if (typeof text === 'string' && text.indexOf('__RESET__') === 0) {
+          var full = text.slice('__RESET__'.length).replace(/</g,'&lt;');
+          if (lastAi && !lastAi.classList.contains('complete')) {
+            lastAi.innerHTML = full + '<span class="cursor">|</span>';
+          } else {
+            msgs.innerHTML += '<div class="msg ai">' + full + '<span class="cursor">|</span></div>';
+          }
+          msgs.scrollTop = msgs.scrollHeight;
+          return;
+        }
         if (lastAi && !lastAi.classList.contains('complete')) {
           var cur = lastAi.innerHTML;
           // Strip trailing cursor
@@ -4400,7 +4410,7 @@ function createMiniChat() {
       return;
     }
     if (typeof chunk === 'string' && chunk.indexOf('__RESET__') === 0) {
-      miniChatWindow.webContents.send('mini:replyComplete', chunk.slice('__RESET__'.length));
+      miniChatWindow.webContents.send('mini:reply', chunk);
       sseActive = true;
       return;
     }
