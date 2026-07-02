@@ -148,7 +148,7 @@ function scheduleMiniStreamEnd() {
   __miniIdleTimer = setTimeout(function() {
     resetMiniStreamState();
     ipcRenderer.send('chat:chunk', '__END__');
-  }, 1200);
+  }, 4000);
 }
 
 function emitMiniStreamUpdate() {

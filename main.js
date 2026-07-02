@@ -4320,6 +4320,10 @@ function createMiniChat() {
                 lastText = text;
                 stable = 0;
               }
+              // If DOM streaming is active, do not early-stop on transient stable partial text.
+              if (sseActive) {
+                return;
+              }
               if ((stable >= 4 || attempts > 60) && lastText.length > 10 && miniChatWindow && !miniChatWindow.isDestroyed()) {
                 clearInterval(miniChatPollTimer); miniChatPollTimer = null;
                 // Always send the final stable answer, even if SSE streamed partial content.
