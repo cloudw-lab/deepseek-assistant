@@ -12,42 +12,6 @@ const agentCore = require('./agent-core.js');
 const deepseekWebDriver = require('./deepseek-web-driver.js');
 const protocol = require('./tool-protocol.js');
 
-// Agent loop: detect tool calls in AI response, execute, feed results back
-function runAgentLoop(answer, wcid) {
-  if (!answer || !wcid) return;
-  agentCore.maybeExecuteToolCall(answer).then(function(execResult) {
-    if (!execResult) return;
-    console.log('[Agent Loop] detected tool call:', execResult.tool);
-    var toolMsg = '\n\n' + agentCore.buildToolResultMessage(execResult);
-    if (miniChatWindow && !miniChatWindow.isDestroyed()) {
-      miniChatWindow.webContents.send('mini:replyComplete', toolMsg);
-    }
-
-    // Feed tool result back to the webview conversation
-    try {
-      var wc = require('electron').webContents.fromId(wcid);
-      if (wc && !wc.isDestroyed()) {
-        wc.executeJavaScript(
-          '(function(){' +
-          'var ta=document.querySelector("textarea");if(!ta)return;' +
-          'var ns=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value").set;' +
-          'ns.call(ta,"");ns.call(ta,' + JSON.stringify(toolMsg.trim()) + ');ta.focus();' +
-          'ta.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText",data:' + JSON.stringify(toolMsg.trim()) + '}));' +
-          'ta.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:' + JSON.stringify(toolMsg.trim()) + '}));' +
-          'ta.dispatchEvent(new Event("change",{bubbles:true}));' +
-          'var btns=document.querySelectorAll("button");var sBtn=null;' +
-          'for(var i=btns.length-1;i>=0;i--){var b=btns[i];if(b.disabled||!b.offsetParent)continue;var cls=(b.className||"").toLowerCase();if(cls.indexOf("send")>=0){sBtn=b;break;}}' +
-          'if(sBtn){sBtn.dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));sBtn.dispatchEvent(new MouseEvent("mouseup",{bubbles:true}));sBtn.click();}' +
-          'ta.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,bubbles:true,composed:true,cancelable:true}));' +
-          '})()'
-        ).catch(function(){});
-      }
-    } catch(_) {}
-  }).catch(function(e) {
-    console.log('[Agent Loop] tool error:', e.message);
-  });
-}
-
 let mainWindow = null;
 let tray = null;
 let httpServer = null;
@@ -4012,7 +3976,9 @@ function createMiniChat() {
           onFinal: function(text) {
             var answer = protocol.extractFinalAnswer(text).replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
             miniChatWindow.webContents.send('mini:replyComplete', answer);
-            runAgentLoop(answer, wcid);
+            agentCore.continueWithToolCall(answer, { wcid: wcid, miniChatWindow: miniChatWindow }).catch(function(e) {
+              console.log('[Agent Loop] tool error:', e.message);
+            });
           },
           onTimeout: function() {
             miniChatWindow.webContents.send('mini:reply', '\u672a\u83b7\u53d6\u5230\u56de\u590d\uff0c\u8bf7\u68c0\u67e5\u4e3b\u7a97\u53e3');
@@ -4391,7 +4357,9 @@ function createMiniChat() {
                 var answer = lastText.replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
                 miniChatWindow.webContents.send('mini:replyComplete', answer);
                 // Agent loop: check if AI response calls for local tool execution
-                runAgentLoop(answer, wcid);
+            agentCore.continueWithToolCall(answer, { wcid: wcid, miniChatWindow: miniChatWindow }).catch(function(e) {
+              console.log('[Agent Loop] tool error:', e.message);
+            });
                 if (miniChatDiagTimer) { clearInterval(miniChatDiagTimer); miniChatDiagTimer = null; }
                 try { pw.send('chat:stream:stop'); } catch (_) {}
               }
