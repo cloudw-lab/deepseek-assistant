@@ -3852,7 +3852,10 @@ function createMiniChat() {
           msgs.innerHTML += '<div class="msg ai complete">' + text.replace(/</g,'&lt;') + '</div>';
         } else if (text && lastAi) {
           // Full reply from polling, replace streaming content
-          lastAi.innerHTML = text.replace(/</g,'&lt;');
+          var currentText = (lastAi.textContent || '').trim();
+          if (currentText !== text.trim()) {
+            lastAi.innerHTML = text.replace(/</g,'&lt;');
+          }
           lastAi.classList.add('complete');
         } else if (lastAi) {
           // SSE stream ended, remove cursor

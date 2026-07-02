@@ -131,7 +131,9 @@ function extractLatestAssistantText() {
     var r = roots[roots.length - 1].cloneNode(true);
     var nodes = r.querySelectorAll('.dpp-tool-block,.dpp-agent-container');
     for (var i = 0; i < nodes.length; i++) nodes[i].remove();
-    return (r.textContent || '').trim();
+    var text = (r.textContent || '').trim();
+    if (text.indexOf('已思考（') === 0 || text.indexOf('正在思考') === 0) return '';
+    return text;
   } catch (_) { return ''; }
 }
 
