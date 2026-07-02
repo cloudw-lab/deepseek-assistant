@@ -265,6 +265,8 @@ function startReplyPolling(opts) {
   var attempts = 0;
   var initialMsgCount = -1;
   var initDone = false;
+  var thinkingSeenCount = 0; // wait for real answer after thinking block
+  var finalized = false; // prevent double-fire
 
   function poll() {
     attempts++;
@@ -311,8 +313,10 @@ function startReplyPolling(opts) {
 
       console.log('[Poll#' + attempts + '] NEW count=' + count + ' text=' + (text||'').slice(0,80));
 
-      // If text contains thinking/thought block, try to extract the real answer
-      if (text.indexOf('已思考') === 0 || text.indexOf('正在思考') === 0 || text.indexOf('已执行工具') === 0) {
+      // If this message is a thinking/planning block, note it and wait for the real answer
+      var isThinking = text.indexOf('已思考') === 0 || text.indexOf('正在思考') === 0 || text.indexOf('已执行工具') === 0;
+      if (isThinking) {
+        // Try extracting lines after the last thinking/step/agent marker
         var lines = text.split('\n');
         var cut = -1;
         for (var j = 0; j < lines.length; j++) {
@@ -321,19 +325,40 @@ function startReplyPolling(opts) {
           }
         }
         if (cut >= 0 && cut < lines.length - 1) {
-          text = lines.slice(cut + 1).join('\n').trim();
+          var after = lines.slice(cut + 1).join('\n').trim();
+          if (after.length > 30) {
+            text = after;
+          } else {
+            // Real answer not yet appended to this message, keep waiting
+            console.log('[Poll#' + attempts + '] thinking block, waiting for real answer count=' + count);
+            if (count > thinkingSeenCount) thinkingSeenCount = count;
+            lastText = ''; stable = 0;
+            timerRef.timer = setTimeout(poll, 2000);
+            return;
+          }
         } else {
-          // No real answer yet, keep waiting
-          lastText = '';
-          stable = 0;
+          console.log('[Poll#' + attempts + '] thinking block, waiting for real answer count=' + count);
+          if (count > thinkingSeenCount) thinkingSeenCount = count;
+          lastText = ''; stable = 0;
           timerRef.timer = setTimeout(poll, 2000);
           return;
         }
       }
 
+      // If we've seen thinking blocks, ensure we're past them (count must exceed thinking block count)
+      if (thinkingSeenCount > 0 && count <= thinkingSeenCount) {
+        console.log('[Poll#' + attempts + '] still in thinking phase count=' + count + ' seen=' + thinkingSeenCount);
+        lastText = '';
+        stable = 0;
+        timerRef.timer = setTimeout(poll, 2000);
+        return;
+      }
+
       if (text && text.length > 30 && text === lastText) stable++;
       else if (text && text.length > 30) { lastText = text; stable = 0; }
       if ((stable >= 4 || attempts > 60) && lastText.length > 10) {
+        if (finalized) return;
+        finalized = true;
         clearInterval(timerRef.timer); timerRef.timer = null;
         onFinal(lastText);
         if (onDebugStop) onDebugStop(pw);
