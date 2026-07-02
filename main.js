@@ -4178,8 +4178,9 @@ function createMiniChat() {
             if(sBtn){
               var ariaDisabled=(sBtn.getAttribute("aria-disabled")||"").toLowerCase()==='true';
               var sr = sBtn.getBoundingClientRect();
-              dbg('send candidate text=', (sBtn.innerText || sBtn.textContent || '').trim(), 'class=', sBtn.className || '', 'disabled=', !!sBtn.disabled, 'ariaDisabled=', ariaDisabled, 'score=', bestScore, 'rect=', [Math.round(sr.left),Math.round(sr.top),Math.round(sr.width),Math.round(sr.height)].join(','));
-              if(sBtn.disabled || ariaDisabled){
+              var classDisabled = ((sBtn.className || '').toLowerCase().indexOf('disabled') >= 0);
+              dbg('send candidate text=', (sBtn.innerText || sBtn.textContent || '').trim(), 'class=', sBtn.className || '', 'disabled=', !!sBtn.disabled, 'ariaDisabled=', ariaDisabled, 'classDisabled=', classDisabled, 'score=', bestScore, 'rect=', [Math.round(sr.left),Math.round(sr.top),Math.round(sr.width),Math.round(sr.height)].join(','));
+              if(sBtn.disabled || ariaDisabled || classDisabled){
                 if(retries > 0) {
                   if (ta0) {
                     ta0.focus();
