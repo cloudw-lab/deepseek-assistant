@@ -3953,7 +3953,10 @@ function createMiniChat() {
           miniChatWindow: miniChatWindow,
           onFinal: function(text) {
             var answer = protocol.extractFinalAnswer(text).replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
-            miniChatWindow.webContents.send('mini:replyComplete', answer);
+            // DOM stream already displaying content; only run agent loop
+            if (!sseActive) {
+              miniChatWindow.webContents.send('mini:replyComplete', answer);
+            }
             agentCore.continueWithToolCall(answer, { wcid: wcid, miniChatWindow: miniChatWindow }).catch(function(e) {
               console.log('[Agent Loop] tool error:', e.message);
             });
