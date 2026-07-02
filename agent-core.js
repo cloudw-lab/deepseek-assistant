@@ -39,9 +39,7 @@ async function continueWithToolCall(answer, opts) {
   if (!execResult) return false;
 
   var toolMsg = '\n\n' + buildToolResultMessage(execResult);
-  if (opts.miniChatWindow && !opts.miniChatWindow.isDestroyed()) {
-    opts.miniChatWindow.webContents.send('mini:replyComplete', toolMsg);
-  }
+  // Display is handled by the caller / re-polling
 
   try {
     var wc = require('electron').webContents.fromId(opts.wcid);

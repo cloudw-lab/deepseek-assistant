@@ -356,7 +356,7 @@ function startReplyPolling(opts) {
 
       if (text && text.length > 30 && text === lastText) stable++;
       else if (text && text.length > 30) { lastText = text; stable = 0; }
-      if ((stable >= 4 || attempts > 60) && lastText.length > 10) {
+      if ((stable >= 6 || attempts > 60) && lastText.length > 10) {
         if (finalized) return;
         finalized = true;
         clearInterval(timerRef.timer); timerRef.timer = null;

@@ -3947,20 +3947,36 @@ function createMiniChat() {
           onLine: function(line) { console.log('[MiniChatInject]', line); }
         });
         if (!question && images.length === 0) { return; }
-        if (miniChatPollTimer) { clearInterval(miniChatPollTimer); miniChatPollTimer = null; }
+        if (miniChatPollTimer) { clearInterval(miniChatPollTimer.timer); miniChatPollTimer = null; }
         var pollRef = deepseekWebDriver.startReplyPolling({
           wcid: wcid,
           miniChatWindow: miniChatWindow,
-          onFinal: function(text) {
+          onFinal: async function(text) {
             var answer = protocol.extractFinalAnswer(text).replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
             var hasToolCall = protocol.extractToolCall(answer) !== null;
             // If answer contains a tool call, let continueWithToolCall handle display
             if (!hasToolCall && !sseActive) {
               miniChatWindow.webContents.send('mini:replyComplete', answer);
             }
-            agentCore.continueWithToolCall(answer, { wcid: wcid, miniChatWindow: miniChatWindow }).catch(function(e) {
-              console.log('[Agent Loop] tool error:', e.message);
-            });
+            var continued = await agentCore.continueWithToolCall(answer, { wcid: wcid, miniChatWindow: miniChatWindow });
+            if (continued) {
+              // Tool result was injected into webview, start fresh polling for AI's response
+        if (miniChatPollTimer) { clearInterval(miniChatPollTimer.timer); miniChatPollTimer = null; }
+              var pollRef = deepseekWebDriver.startReplyPolling({
+                wcid: wcid,
+                miniChatWindow: miniChatWindow,
+                onFinal: function(finalText) {
+                  var ans = protocol.extractFinalAnswer(finalText).replace(/\u6e29\u99a8\u63d0\u793a[\uff1a:][\\s\\S]*$/g,'').replace(/\n{3,}/g,'\n\n').trim();
+                  if (!protocol.extractToolCall(ans)) {
+                    miniChatWindow.webContents.send('mini:replyComplete', ans);
+                  }
+                  agentCore.continueWithToolCall(ans, { wcid: wcid, miniChatWindow: miniChatWindow }).catch(function(){});
+                },
+                onTimeout: function() {},
+                onDebugStop: function() {}
+              });
+        miniChatPollTimer = pollRef; // store timerRef object for correct clearing
+            }
           },
           onTimeout: function() {
             miniChatWindow.webContents.send('mini:reply', '\u672a\u83b7\u53d6\u5230\u56de\u590d\uff0c\u8bf7\u68c0\u67e5\u4e3b\u7a97\u53e3');
@@ -3970,7 +3986,7 @@ function createMiniChat() {
             deepseekWebDriver.stopDomStream(pw);
           }
         });
-        miniChatPollTimer = pollRef.timer;
+        miniChatPollTimer = pollRef; // store timerRef object for correct clearing
         return;
 
         // Build a single combined script
