@@ -128,10 +128,17 @@ function extractLatestAssistantText() {
   try {
     var roots = document.querySelectorAll('._74c0879, .ds-assistant-message-main-content');
     if (!roots.length) return '';
-    var r = roots[roots.length - 1].cloneNode(true);
-    var nodes = r.querySelectorAll('.dpp-tool-block,.dpp-agent-container');
-    for (var i = 0; i < nodes.length; i++) nodes[i].remove();
-    var text = (r.textContent || '').trim();
+    // Aggregate the tail of the current assistant turn instead of only the very last node.
+    var start = Math.max(0, roots.length - 8);
+    var parts = [];
+    for (var k = start; k < roots.length; k++) {
+      var r = roots[k].cloneNode(true);
+      var nodes = r.querySelectorAll('.dpp-tool-block,.dpp-agent-container');
+      for (var i = 0; i < nodes.length; i++) nodes[i].remove();
+      var chunk = (r.textContent || '').trim();
+      if (chunk) parts.push(chunk);
+    }
+    var text = parts.join('\n').trim();
     if (text.indexOf('已思考（') === 0 || text.indexOf('正在思考') === 0 || text.indexOf('已执行工具') === 0) {
       var lines = text.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
       var cut = -1;
