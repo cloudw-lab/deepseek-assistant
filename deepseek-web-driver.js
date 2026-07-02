@@ -276,7 +276,7 @@ function startReplyPolling(opts) {
       clearInterval(timerRef.timer); timerRef.timer = null; return;
     }
     pw.executeJavaScript(
-      '(function(){var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
+      '(function(){var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content, [class*=assistant], [class*=message-main]");' +
       'var count=roots.length;' +
       'if(!count)return JSON.stringify({count:0,text:""});' +
       'var r=roots[count-1].cloneNode(true);' +
@@ -288,6 +288,7 @@ function startReplyPolling(opts) {
       var text = data.text || '';
 
       if (!initDone) {
+        console.log('[Poll#' + attempts + '] init count=' + count + ' text=' + (text||'').slice(0,40));
         initialMsgCount = count;
         initDone = true;
         // Immediately schedule next poll to start checking
@@ -297,10 +298,16 @@ function startReplyPolling(opts) {
 
       // Skip stale messages (pre-existing before this question)
       if (count <= initialMsgCount) {
-        if (attempts > 80) onTimeout();
-  timerRef.timer = setTimeout(poll, 200);
+        if (attempts > 80) {
+          clearTimeout(timerRef.timer); timerRef.timer = null;
+          onTimeout();
+          return;
+        }
+        timerRef.timer = setTimeout(poll, 2000);
         return;
       }
+
+      console.log('[Poll#' + attempts + '] NEW count=' + count + ' text=' + (text||'').slice(0,80));
 
       if (text && text.length > 30 && text === lastText) stable++;
       else if (text && text.length > 30) { lastText = text; stable = 0; }
