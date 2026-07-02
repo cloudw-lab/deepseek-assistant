@@ -146,12 +146,18 @@ function buildInjectedTurnCode(opts) {
           var cls=(b.className||"").toLowerCase();
           var aria=(b.getAttribute("aria-label")||"").toLowerCase();
           var txt=(b.textContent||"").trim().toLowerCase();
+          // Exclude mode/tool toggle buttons
           if(txt.indexOf("深度思考")>=0 || txt.indexOf("智能搜索")>=0 || txt.indexOf("快速模式")>=0 || txt.indexOf("专家模式")>=0 || txt.indexOf("识图模式")>=0) continue;
+          if(cls.indexOf("capsule")>=0 || cls.indexOf("iconlabel")>=0) continue;
           var score = 0;
           if(cls.indexOf("send")>=0 || aria.indexOf("send")>=0 || aria.indexOf("发送")>=0 || txt==="send" || txt==="发送") score += 1000;
+          // Prefer primary/filled buttons (send button style)
+          if(cls.indexOf("primary")>=0 || cls.indexOf("filled")>=0) score += 500;
           if(b.querySelector && b.querySelector('svg')) score += 100;
           if(score > bestScore){ bestScore = score; sBtn = b; }
         }
+        // Minimum score threshold to avoid misidentifying toggle buttons
+        if(bestScore < 200) sBtn = null;
         if(sBtn){
           var ariaDisabled=(sBtn.getAttribute("aria-disabled")||"").toLowerCase()==='true';
           var classDisabled = ((sBtn.className || '').toLowerCase().indexOf('disabled') >= 0);
