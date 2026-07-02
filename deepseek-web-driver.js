@@ -263,42 +263,63 @@ function startReplyPolling(opts) {
   var lastText = '';
   var stable = 0;
   var attempts = 0;
-  timerRef.timer = setInterval(function() {
+  var initialMsgCount = -1;
+  var initDone = false;
+
+  function poll() {
     attempts++;
     if (!miniChatWindow || miniChatWindow.isDestroyed()) {
-      clearInterval(timerRef.timer);
-      timerRef.timer = null;
-      return;
+      clearInterval(timerRef.timer); timerRef.timer = null; return;
     }
     var pw = require('electron').webContents.fromId(wcid);
     if (!pw || pw.isDestroyed()) {
-      clearInterval(timerRef.timer);
-      timerRef.timer = null;
-      return;
+      clearInterval(timerRef.timer); timerRef.timer = null; return;
     }
     pw.executeJavaScript(
       '(function(){var roots=document.querySelectorAll("._74c0879, .ds-assistant-message-main-content");' +
-      'if(!roots.length)return"";var r=roots[roots.length-1].cloneNode(true);' +
+      'var count=roots.length;' +
+      'if(!count)return JSON.stringify({count:0,text:""});' +
+      'var r=roots[count-1].cloneNode(true);' +
       'var nodes=r.querySelectorAll(".dpp-tool-block,.dpp-agent-container");' +
       'for(var i=0;i<nodes.length;i++)nodes[i].remove();' +
-      'return (r.textContent||"").trim();})()'
-    ).then(function(text) {
+      'return JSON.stringify({count:count,text:(r.textContent||"").trim()});})()'
+    ).then(function(result) {
+      var data = {};
+      try { data = JSON.parse(result); } catch(_) { data = { count: 0, text: '' }; }
+      var count = data.count || 0;
+      var text = data.text || '';
+
+      if (!initDone) {
+        initialMsgCount = count;
+        initDone = true;
+        if (attempts < 5) { timerRef.timer = setTimeout(poll, 2000); return; }
+      }
+
+      // Skip stale messages (pre-existing before this question)
+      if (count <= initialMsgCount) {
+        if (attempts > 80) onTimeout();
+        timerRef.timer = setTimeout(poll, 2000);
+        return;
+      }
+
       if (text && text.length > 50 && text === lastText) stable++;
       else if (text && text.length > 50) { lastText = text; stable = 0; }
       if ((stable >= 4 || attempts > 60) && lastText.length > 10) {
-        clearInterval(timerRef.timer);
-        timerRef.timer = null;
+        clearInterval(timerRef.timer); timerRef.timer = null;
         onFinal(lastText);
         if (onDebugStop) onDebugStop(pw);
       }
       if (attempts > 90 && lastText.length === 0) {
-        clearInterval(timerRef.timer);
-        timerRef.timer = null;
+        clearInterval(timerRef.timer); timerRef.timer = null;
         onTimeout();
         if (onDebugStop) onDebugStop(pw);
       }
-    }).catch(function(){});
-  }, 2000);
+      if (timerRef.timer !== null) timerRef.timer = setTimeout(poll, 2000);
+    }).catch(function(){
+      if (timerRef.timer !== null) timerRef.timer = setTimeout(poll, 2000);
+    });
+  }
+  timerRef.timer = setTimeout(poll, 2000);
   return timerRef;
 }
 
