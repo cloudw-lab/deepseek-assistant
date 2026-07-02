@@ -280,6 +280,8 @@ function startReplyPolling(opts) {
       'var count=roots.length;' +
       'if(!count)return JSON.stringify({count:0,text:""});' +
       'var r=roots[count-1].cloneNode(true);' +
+      'var nodes=r.querySelectorAll(".dpp-tool-block,.dpp-agent-container");' +
+      'for(var i=0;i<nodes.length;i++)nodes[i].remove();' +
       'return JSON.stringify({count:count,text:(r.textContent||"").trim()});})()'
     ).then(function(result) {
       var data = {};
