@@ -186,15 +186,21 @@ function buildInjectedTurnCode(opts) {
         if (!Q && IMG_COUNT > 0) { clickSendWhenReady(200, true); return; }
         if (Q) clickSendWhenReady(120, true);
       }
-      function waitForModeAndPaste(retries) {
+      function waitForModeAndPaste(retries, totalWaits) {
+        if (totalWaits === undefined) totalWaits = 0;
         var ta = document.querySelector('textarea');
         var ready = modeReady();
         if (ready && ta && ta.offsetParent && !ta.disabled) { dbg('mode ready, start paste'); pasteImage(0); return; }
+        totalWaits++;
         if (retries <= 0) {
-          if (target === "快速模式") { dbg('mode wait timeout on default mode, force paste'); pasteImage(0); return; }
-          dbg('mode not ready yet, extend waiting'); setTimeout(function(){ waitForModeAndPaste(12); }, 800); return;
+          if (target === "快速模式" || totalWaits >= 4) {
+            dbg('mode wait timeout, force paste');
+            pasteImage(0); return;
+          }
+          dbg('mode not ready yet, extend waiting');
+          setTimeout(function(){ waitForModeAndPaste(12, totalWaits); }, 800); return;
         }
-        setTimeout(function(){ waitForModeAndPaste(retries - 1); }, 400);
+        setTimeout(function(){ waitForModeAndPaste(retries - 1, totalWaits); }, 400);
       }
       setTimeout(function(){ waitForModeAndPaste(12); }, 800);
     }).toString()
