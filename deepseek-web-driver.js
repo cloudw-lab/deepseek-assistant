@@ -265,7 +265,8 @@ function startReplyPolling(opts) {
   var attempts = 0;
   var initialMsgCount = -1;
   var initDone = false;
-  var thinkingSeenCount = 0; // wait for real answer after thinking block
+  var thinkingSeenCount = 0;
+  var thinkingTextLen = 0; // track text length when thinking was detected
   var finalized = false; // prevent double-fire
 
   function poll() {
@@ -313,45 +314,44 @@ function startReplyPolling(opts) {
 
       console.log('[Poll#' + attempts + '] NEW count=' + count + ' text=' + (text||'').slice(0,80));
 
-      // If this message is a thinking/planning block, note it and wait for the real answer
+      // Handle thinking blocks: wait for real answer to appear (either new message or substantial growth)
       var isThinking = text.indexOf('已思考') === 0 || text.indexOf('正在思考') === 0 || text.indexOf('已执行工具') === 0;
       if (isThinking) {
-        // Try extracting lines after the last thinking/step/agent marker
-        var lines = text.split('\n');
-        var cut = -1;
-        for (var j = 0; j < lines.length; j++) {
-          if (/^(已思考|正在思考|已执行工具|Step\s*\d+|Agent\s*完成)/.test(lines[j].trim())) {
-            cut = j;
-          }
+        if (count > thinkingSeenCount) {
+          thinkingSeenCount = count;
+          thinkingTextLen = text.length;
         }
-        if (cut >= 0 && cut < lines.length - 1) {
-          var after = lines.slice(cut + 1).join('\n').trim();
-          if (after.length > 30) {
-            text = after;
-          } else {
-            // Real answer not yet appended to this message, keep waiting
-            console.log('[Poll#' + attempts + '] thinking block, waiting for real answer count=' + count);
-            if (count > thinkingSeenCount) thinkingSeenCount = count;
-            lastText = ''; stable = 0;
-            timerRef.timer = setTimeout(poll, 2000);
-            return;
+        // If text has grown substantially since thinking was first detected, answer may be appended
+        if (thinkingTextLen > 0 && count === thinkingSeenCount && text.length > thinkingTextLen + 60) {
+          // Answer was appended to same message; strip thinking prefix lines and proceed
+          var lines = text.split('\n');
+          var cut = -1;
+          for (var j = 0; j < lines.length; j++) {
+            if (/^(已思考|正在思考|已执行工具|Step\s*\d+|Agent\s*完成)/.test(lines[j].trim())) cut = j;
           }
+          if (cut >= 0 && cut < lines.length - 1) {
+            text = lines.slice(cut + 1).join('\n').trim();
+          }
+          // Fall through to stability check with extracted answer
         } else {
-          console.log('[Poll#' + attempts + '] thinking block, waiting for real answer count=' + count);
-          if (count > thinkingSeenCount) thinkingSeenCount = count;
+          console.log('[Poll#' + attempts + '] thinking block, waiting for answer count=' + count + ' thinkLen=' + thinkingTextLen + ' curLen=' + text.length);
           lastText = ''; stable = 0;
           timerRef.timer = setTimeout(poll, 2000);
           return;
         }
       }
 
-      // If we've seen thinking blocks, ensure we're past them (count must exceed thinking block count)
+      // If we've seen thinking blocks, ensure we're past them
       if (thinkingSeenCount > 0 && count <= thinkingSeenCount) {
-        console.log('[Poll#' + attempts + '] still in thinking phase count=' + count + ' seen=' + thinkingSeenCount);
-        lastText = '';
-        stable = 0;
-        timerRef.timer = setTimeout(poll, 2000);
-        return;
+        // Check if text grew significantly (answer appended to same node)
+        if (text.length > thinkingTextLen + 60) {
+          thinkingSeenCount = 0; // accept this as answer, fall through
+        } else {
+          console.log('[Poll#' + attempts + '] still in thinking phase count=' + count);
+          lastText = ''; stable = 0;
+          timerRef.timer = setTimeout(poll, 2000);
+          return;
+        }
       }
 
       if (text && text.length > 30 && text === lastText) stable++;
