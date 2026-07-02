@@ -175,7 +175,10 @@ function scheduleMiniStreamEnd() {
 
 function emitMiniStreamUpdate() {
   var text = extractLatestAssistantText();
-  if (!text) return;
+  if (!text) {
+    if (__miniLastText) scheduleMiniStreamEnd();
+    return;
+  }
   if (text === __miniLastText) {
     scheduleMiniStreamEnd();
     return;
