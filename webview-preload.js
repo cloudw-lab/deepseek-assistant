@@ -132,7 +132,20 @@ function extractLatestAssistantText() {
     var nodes = r.querySelectorAll('.dpp-tool-block,.dpp-agent-container');
     for (var i = 0; i < nodes.length; i++) nodes[i].remove();
     var text = (r.textContent || '').trim();
-    if (text.indexOf('已思考（') === 0 || text.indexOf('正在思考') === 0) return '';
+    if (text.indexOf('已思考（') === 0 || text.indexOf('正在思考') === 0 || text.indexOf('已执行工具') === 0) {
+      var lines = text.split('\n').map(function(s) { return s.trim(); }).filter(Boolean);
+      var cut = -1;
+      for (var j = 0; j < lines.length; j++) {
+        if (/^(已思考|正在思考|已执行工具|Step\s*\d+|Agent\s*完成)/.test(lines[j])) {
+          cut = j;
+        }
+      }
+      if (cut >= 0 && cut < lines.length - 1) {
+        text = lines.slice(cut + 1).join('\n').trim();
+      } else {
+        return '';
+      }
+    }
     return text;
   } catch (_) { return ''; }
 }
